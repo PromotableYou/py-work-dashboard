@@ -30,6 +30,7 @@ export default function App() {
               <Route path="/timesheet" element={<TimesheetPage />} />
               <Route path="/meetings" element={<MeetingsPage workspace="shaniah" />} />
               <Route path="/notes" element={<NotesPage workspace="shaniah" />} />
+              <Route path="/roster" element={<RosterPage />} />
               {/* Stacey */}
               <Route path="/stacey" element={<BossDashboardPage />} />
               <Route path="/stacey/tasks" element={<TasksPage workspace="stacey" />} />
@@ -39,7 +40,6 @@ export default function App() {
               <Route path="/stacey/meetings" element={<MeetingsPage workspace="stacey" />} />
               <Route path="/stacey/notes" element={<NotesPage workspace="stacey" />} />
               <Route path="/stacey/coaches-calendar" element={<CoachesCalendarPage />} />
-              <Route path="/stacey/roster" element={<RosterPage />} />
               <Route path="/stacey/team-hours" element={<TeamHoursPage />} />
             </Routes>
           </div>
