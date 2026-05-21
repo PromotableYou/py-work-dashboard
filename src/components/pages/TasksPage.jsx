@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Check, Trash2, FileText, ChevronDown, ChevronUp, AlertCircle, Circle } from 'lucide-react'
 import {
-  getTasks, addTask, updateTask, deleteTask,
   getProjects, addProject, updateProject, deleteProject,
   getSubtasks, addSubtask, updateSubtask, deleteSubtask,
 } from '../../lib/supabase'
-
-const TODAY = new Date().toISOString().slice(0, 10)
 
 const PRIORITY_STYLES = {
   high:   { dot: 'bg-red-400',    badge: 'bg-red-50 text-red-600 border-red-200'    },
@@ -14,7 +11,7 @@ const PRIORITY_STYLES = {
   low:    { dot: 'bg-sand-300',   badge: 'bg-sand-50 text-sand-500 border-sand-200'  },
 }
 
-// ─── Subtask row inside a project ─────────────────────────────────────────────
+// ─── Subtask row inside a project panel ──────────────────────────────────────
 function SubtaskRow({ sub, onToggle, onDelete }) {
   return (
     <div className={`flex items-start gap-3 px-5 py-2.5 group hover:bg-sand-50 transition-colors ${sub.completed ? 'opacity-50' : ''}`}>
@@ -39,7 +36,7 @@ function SubtaskRow({ sub, onToggle, onDelete }) {
   )
 }
 
-// ─── Project panel ─────────────────────────────────────────────────────────────
+// ─── Project panel ────────────────────────────────────────────────────────────
 function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSub, onToggleSub, onDeleteSub }) {
   const [expanded, setExpanded] = useState(true)
   const [newSub, setNewSub] = useState('')
@@ -92,7 +89,7 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
               </span>
             </div>
 
-            {/* Progress */}
+            {/* Progress bar */}
             {total > 0 && (
               <div className="flex items-center gap-2 mt-2">
                 <div className="flex-1 h-1.5 bg-sand-100 rounded-full overflow-hidden">
@@ -101,8 +98,11 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <span className="text-xs text-sand-400 shrink-0">{done}/{total}</span>
+                <span className="text-xs text-sand-400 shrink-0">{done}/{total} · {pct}%</span>
               </div>
+            )}
+            {total === 0 && (
+              <p className="text-xs text-sand-300 mt-1">No tasks yet</p>
             )}
           </div>
 
@@ -153,12 +153,9 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
             <p className="text-sm text-sand-300 text-center py-5">No tasks yet — add one below</p>
           )}
 
-          {/* Incomplete tasks */}
           {subtasks.filter(s => !s.completed).map(s => (
             <SubtaskRow key={s.id} sub={s} onToggle={onToggleSub} onDelete={onDeleteSub} />
           ))}
-
-          {/* Completed tasks (dimmed, below) */}
           {subtasks.filter(s => s.completed).map(s => (
             <SubtaskRow key={s.id} sub={s} onToggle={onToggleSub} onDelete={onDeleteSub} />
           ))}
@@ -184,57 +181,107 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
   )
 }
 
-// ─── Notepad (today quick list) ────────────────────────────────────────────────
-function Notepad({ tasks, onAdd, onToggle, onDelete }) {
-  const [text, setText] = useState('')
+// ─── Today's Focus notepad (project-linked) ───────────────────────────────────
+function Notepad({ projects, subtasks, onAddSub, onToggleSub, onDeleteSub }) {
+  const [selectedId, setSelectedId] = useState(null)
+  const [newText, setNewText] = useState('')
 
-  function submit(e) {
+  // Auto-select first project on load / if selected project disappears
+  useEffect(() => {
+    if (projects.length > 0 && (!selectedId || !projects.find(p => p.id === selectedId))) {
+      setSelectedId(projects[0].id)
+    }
+  }, [projects, selectedId])
+
+  const selectedProject = projects.find(p => p.id === selectedId) || null
+  const projectSubs = subtasks.filter(s => s.project_id === selectedId)
+  const done = projectSubs.filter(s => s.completed).length
+  const total = projectSubs.length
+  const pct = total ? Math.round((done / total) * 100) : 0
+
+  const incomplete = projectSubs.filter(s => !s.completed)
+  const complete = projectSubs.filter(s => s.completed)
+
+  function submitTask(e) {
     e.preventDefault()
-    if (!text.trim()) return
-    onAdd({ text: text.trim(), type: 'daily', date: TODAY, completed: false, notes: '', project_id: null })
-    setText('')
+    if (!newText.trim() || !selectedId) return
+    onAddSub(selectedId, newText.trim())
+    setNewText('')
   }
-
-  const incomplete = tasks.filter(t => !t.completed)
-  const complete = tasks.filter(t => t.completed)
 
   return (
     <div className="bg-[#FFFDF7] border border-amber-200 rounded-2xl overflow-hidden shadow-sm sticky top-6">
+
       {/* Header */}
       <div className="px-5 py-4 border-b border-amber-100">
-        <p className="text-xs font-semibold text-amber-500 uppercase tracking-widest">Today</p>
-        <p className="text-sm text-sand-500 mt-0.5">
-          {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' })}
-        </p>
+        <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest mb-2">Today's Focus</p>
+
+        {projects.length === 0 ? (
+          <p className="text-sm text-sand-400">No projects yet</p>
+        ) : (
+          <select
+            value={selectedId || ''}
+            onChange={e => setSelectedId(e.target.value)}
+            className="w-full text-sm font-bold text-sand-900 bg-transparent border-0 focus:outline-none cursor-pointer pr-1 -ml-0.5"
+          >
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Progress */}
+        {selectedProject && (
+          <div className="mt-2.5">
+            {total > 0 ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-amber-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blush-400 to-blush-500 rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-amber-600 font-semibold shrink-0">{done}/{total}</span>
+                </div>
+                <p className="text-[10px] text-amber-400 mt-1">{pct}% complete</p>
+              </>
+            ) : (
+              <p className="text-xs text-sand-300">No tasks yet — add one below</p>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Tasks — notepad style */}
-      <div className="divide-y divide-amber-100/60 min-h-[200px]">
-        {incomplete.length === 0 && complete.length === 0 && (
-          <p className="text-sm text-sand-300 text-center py-8">Nothing yet today</p>
+      {/* Task list */}
+      <div className="divide-y divide-amber-100/60 min-h-[160px]">
+        {selectedProject && incomplete.length === 0 && complete.length === 0 && (
+          <p className="text-sm text-sand-300 text-center py-8">Nothing yet — add a task below</p>
         )}
-        {incomplete.map(t => (
-          <div key={t.id} className="flex items-start gap-3 px-5 py-3 group hover:bg-amber-50/50 transition-colors">
+
+        {incomplete.map(s => (
+          <div key={s.id} className="flex items-start gap-3 px-5 py-3 group hover:bg-amber-50/50 transition-colors">
             <button
-              onClick={() => onToggle(t)}
+              onClick={() => onToggleSub(s)}
               className="mt-0.5 w-4 h-4 rounded border-2 border-amber-300 hover:border-blush-400 flex items-center justify-center shrink-0 transition-colors"
             />
-            <span className="flex-1 text-sm text-sand-800 leading-relaxed">{t.text}</span>
-            <button onClick={() => onDelete(t.id)} className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5">
+            <span className="flex-1 text-sm text-sand-800 leading-relaxed">{s.text}</span>
+            <button onClick={() => onDeleteSub(s.id)} className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5">
               <Trash2 className="w-3 h-3" />
             </button>
           </div>
         ))}
-        {complete.map(t => (
-          <div key={t.id} className="flex items-start gap-3 px-5 py-3 group opacity-40 hover:bg-amber-50/50 transition-colors">
+
+        {complete.map(s => (
+          <div key={s.id} className="flex items-start gap-3 px-5 py-3 group opacity-40 hover:bg-amber-50/30 transition-colors">
             <button
-              onClick={() => onToggle(t)}
+              onClick={() => onToggleSub(s)}
               className="mt-0.5 w-4 h-4 rounded border-2 bg-blush-400 border-blush-400 flex items-center justify-center shrink-0"
             >
               <Check className="w-2.5 h-2.5 text-white" />
             </button>
-            <span className="flex-1 text-sm text-sand-600 line-through leading-relaxed">{t.text}</span>
-            <button onClick={() => onDelete(t.id)} className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5">
+            <span className="flex-1 text-sm text-sand-600 line-through leading-relaxed">{s.text}</span>
+            <button onClick={() => onDeleteSub(s.id)} className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5">
               <Trash2 className="w-3 h-3" />
             </button>
           </div>
@@ -242,24 +289,25 @@ function Notepad({ tasks, onAdd, onToggle, onDelete }) {
       </div>
 
       {/* Add input */}
-      <form onSubmit={submit} className="border-t border-amber-100 px-5 py-3 flex items-center gap-2">
-        <input
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder="Add to today…"
-          className="flex-1 text-sm bg-transparent text-sand-800 placeholder-sand-400 focus:outline-none"
-        />
-        <button type="submit" className="w-7 h-7 bg-blush-500 hover:bg-blush-600 text-white rounded-lg flex items-center justify-center transition-colors shrink-0">
-          <Plus className="w-3.5 h-3.5" />
-        </button>
-      </form>
+      {selectedProject && (
+        <form onSubmit={submitTask} className="border-t border-amber-100 px-5 py-3 flex items-center gap-2">
+          <input
+            value={newText}
+            onChange={e => setNewText(e.target.value)}
+            placeholder="Add task to this project…"
+            className="flex-1 text-sm bg-transparent text-sand-800 placeholder-sand-400 focus:outline-none"
+          />
+          <button type="submit" className="w-7 h-7 bg-blush-500 hover:bg-blush-600 text-white rounded-lg flex items-center justify-center transition-colors shrink-0">
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </form>
+      )}
     </div>
   )
 }
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function TasksPage() {
-  const [tasks, setTasks] = useState([])
   const [projects, setProjects] = useState([])
   const [subtasks, setSubtasks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -268,32 +316,15 @@ export default function TasksPage() {
   const [newProject, setNewProject] = useState({ name: '', priority: 'high' })
 
   useEffect(() => {
-    Promise.all([getTasks(), getProjects(), getSubtasks()])
-      .then(([t, p, s]) => { setTasks(t); setProjects(p); setSubtasks(s) })
+    Promise.all([getProjects(), getSubtasks()])
+      .then(([p, s]) => { setProjects(p); setSubtasks(s) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
-  const todayTasks = tasks.filter(t => t.type === 'daily' && t.date === TODAY)
   const activeProjects = projects
     .filter(p => !p.done)
     .sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.priority] - ({ high: 0, medium: 1, low: 2 }[b.priority])))
-
-  // ── Tasks ──
-  async function handleAddTask(data) {
-    try { const s = await addTask(data); setTasks(p => [...p, s]) }
-    catch (e) { setError(e.message) }
-  }
-  async function handleToggleTask(task) {
-    try {
-      await updateTask(task.id, { completed: !task.completed })
-      setTasks(p => p.map(t => t.id === task.id ? { ...t, completed: !t.completed } : t))
-    } catch (e) { setError(e.message) }
-  }
-  async function handleDeleteTask(id) {
-    try { await deleteTask(id); setTasks(p => p.filter(t => t.id !== id)) }
-    catch (e) { setError(e.message) }
-  }
 
   // ── Projects ──
   async function handleAddProject(e) {
@@ -328,8 +359,10 @@ export default function TasksPage() {
 
   // ── Subtasks ──
   async function handleAddSub(projectId, text) {
-    try { const s = await addSubtask({ project_id: projectId, text, completed: false }); setSubtasks(p => [...p, s]) }
-    catch (e) { setError(e.message) }
+    try {
+      const s = await addSubtask({ project_id: projectId, text, completed: false })
+      setSubtasks(p => [...p, s])
+    } catch (e) { setError(e.message) }
   }
   async function handleToggleSub(sub) {
     try {
@@ -338,8 +371,10 @@ export default function TasksPage() {
     } catch (e) { setError(e.message) }
   }
   async function handleDeleteSub(id) {
-    try { await deleteSubtask(id); setSubtasks(p => p.filter(s => s.id !== id)) }
-    catch (e) { setError(e.message) }
+    try {
+      await deleteSubtask(id)
+      setSubtasks(p => p.filter(s => s.id !== id))
+    } catch (e) { setError(e.message) }
   }
 
   if (loading) return (
@@ -440,13 +475,14 @@ export default function TasksPage() {
           )}
         </div>
 
-        {/* Notepad — right 1/3 */}
+        {/* Focus notepad — right 1/3 */}
         <div>
           <Notepad
-            tasks={todayTasks}
-            onAdd={handleAddTask}
-            onToggle={handleToggleTask}
-            onDelete={handleDeleteTask}
+            projects={activeProjects}
+            subtasks={subtasks}
+            onAddSub={handleAddSub}
+            onToggleSub={handleToggleSub}
+            onDeleteSub={handleDeleteSub}
           />
         </div>
       </div>

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckSquare, Calendar, Lightbulb, Brain, Clock, ArrowRight, TrendingUp, Zap, Star, AlertCircle } from 'lucide-react'
-import { getTasks, getProjects, getSubtasks, getEvents, getDumps, getIdeas, getTimelog } from '../../lib/supabase'
+import { getTasks, getProjects, getSubtasks, getDumps, getIdeas, getTimelog } from '../../lib/supabase'
+
+const GCAL_AGENDA = 'https://calendar.google.com/calendar/embed?src=shaniah%40promotableyou.com.au&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA'
 
 const TODAY = new Date().toISOString().slice(0, 10)
 
@@ -27,9 +29,9 @@ export default function DashboardPage() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    Promise.all([getTasks(), getProjects(), getSubtasks(), getEvents(), getDumps(), getIdeas(), getTimelog()])
-      .then(([tasks, projects, subtasks, events, dumps, ideas, timelog]) => {
-        setData({ tasks, projects, subtasks, events, dumps, ideas, timelog })
+    Promise.all([getTasks(), getProjects(), getSubtasks(), getDumps(), getIdeas(), getTimelog()])
+      .then(([tasks, projects, subtasks, dumps, ideas, timelog]) => {
+        setData({ tasks, projects, subtasks, dumps, ideas, timelog })
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -47,7 +49,7 @@ export default function DashboardPage() {
     </div>
   )
 
-  const { tasks, projects, subtasks, events, dumps, ideas, timelog } = data
+  const { tasks, projects, subtasks, dumps, ideas, timelog } = data
 
   // Stats
   const todayTasks = tasks.filter(t => t.type === 'daily' && t.date === TODAY)
@@ -66,12 +68,6 @@ export default function DashboardPage() {
       return s + Math.max(0, (oh + om / 60) - (ih + im / 60))
     }, 0)
 
-  // Upcoming events
-  const upcomingEvents = events
-    .filter(e => e.date >= TODAY)
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
-    .slice(0, 4)
-
   // Projects with progress
   const projectsWithProgress = activeProjects.map(p => {
     const subs = subtasks.filter(s => s.project_id === p.id)
@@ -84,14 +80,6 @@ export default function DashboardPage() {
     medium: 'bg-amber-400',
     low: 'bg-sand-300',
   }
-
-  const EVENT_COLORS = [
-    'border-l-warm-400 bg-warm-50',
-    'border-l-blue-400 bg-blue-50',
-    'border-l-purple-400 bg-purple-50',
-    'border-l-emerald-400 bg-emerald-50',
-    'border-l-pink-400 bg-pink-50',
-  ]
 
   return (
     <div className="space-y-6 pb-6">
@@ -299,7 +287,7 @@ export default function DashboardPage() {
         {/* Right col (1/3) */}
         <div className="space-y-5">
 
-          {/* Upcoming events */}
+          {/* Upcoming events — live Google Calendar */}
           <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-sand-100">
               <div className="flex items-center gap-2">
@@ -307,32 +295,21 @@ export default function DashboardPage() {
                 <h2 className="font-semibold text-sand-900 text-sm">Upcoming</h2>
               </div>
               <Link to="/calendar" className="text-xs text-blush-500 hover:text-blush-600 font-medium flex items-center gap-1">
-                Calendar <ArrowRight className="w-3 h-3" />
+                Full view <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
-            {upcomingEvents.length === 0 ? (
-              <div className="px-5 py-8 text-center">
-                <p className="text-sand-400 text-sm">No upcoming events</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-sand-50">
-                {upcomingEvents.map(ev => {
-                  const isToday = ev.date === TODAY
-                  const d = new Date(ev.date + 'T00:00:00')
-                  return (
-                    <div key={ev.id} className={`flex items-start gap-3 px-5 py-3 border-l-4 ${EVENT_COLORS[ev.color || 0]}`}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-sand-400 font-medium">
-                          {isToday ? 'Today' : d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
-                          {ev.time && ` · ${ev.time}`}
-                        </p>
-                        <p className="text-sm font-medium text-sand-900 truncate">{ev.title}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            {/* Clip the Google Calendar header bar with overflow + negative margin */}
+            <div className="overflow-hidden" style={{ height: 260 }}>
+              <iframe
+                src={GCAL_AGENDA}
+                style={{ border: 0, marginTop: -46, display: 'block' }}
+                width="100%"
+                height="320"
+                frameBorder="0"
+                scrolling="no"
+                title="Upcoming Events"
+              />
+            </div>
           </div>
 
           {/* Latest brain dump */}
