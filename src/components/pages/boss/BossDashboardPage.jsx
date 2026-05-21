@@ -60,15 +60,18 @@ export default function BossDashboardPage() {
     .slice(0, 5)
 
   // Team hours for this pay period
+  const STD_HOURS = 7.6
   const payStartISO = localISO(payStart)
   const payEndISO = localISO(payEnd)
-  const periodHours = teamHours.filter(h => h.date >= payStartISO && h.date <= payEndISO && h.worked)
+  const periodRows = teamHours.filter(h => h.date >= payStartISO && h.date <= payEndISO && h.worked)
 
-  // Days worked per member this period
-  const memberDays = {}
-  teamMembers.forEach(m => { memberDays[m.name] = 0 })
-  periodHours.forEach(h => {
-    if (memberDays[h.person_name] !== undefined) memberDays[h.person_name]++
+  // Hours worked per member this period (use stored hours value, fall back to 7.6 per worked day)
+  const memberHours = {}
+  teamMembers.forEach(m => { memberHours[m.name] = 0 })
+  periodRows.forEach(h => {
+    if (memberHours[h.person_name] !== undefined) {
+      memberHours[h.person_name] += parseFloat(h.hours) || STD_HOURS
+    }
   })
 
   function formatMeetingDate(dateStr) {
@@ -232,8 +235,8 @@ export default function BossDashboardPage() {
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {teamMembers.map(member => {
-              const days = memberDays[member.name] || 0
-              const pct = Math.round((days / 10) * 100)
+              const hours = memberHours[member.name] || 0
+              const pct   = Math.round((hours / (STD_HOURS * 10)) * 100)
               return (
                 <div key={member.id} className="bg-sand-50 rounded-xl p-3">
                   <div className="flex items-center gap-2 mb-2">
@@ -243,7 +246,10 @@ export default function BossDashboardPage() {
                     </div>
                     <p className="text-xs font-semibold text-sand-800 truncate">{member.name}</p>
                   </div>
-                  <p className="text-xl font-bold text-sand-900">{days}<span className="text-xs font-normal text-sand-400 ml-1">days</span></p>
+                  <p className="text-xl font-bold text-sand-900">
+                    {hours % 1 === 0 ? hours : hours.toFixed(1)}
+                    <span className="text-xs font-normal text-sand-400 ml-1">hrs</span>
+                  </p>
                   <div className="mt-1.5 h-1 bg-sand-200 rounded-full overflow-hidden">
                     <div className="h-full bg-blush-400 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
                   </div>
