@@ -27,8 +27,14 @@ const PRIORITY_STYLES = {
 const FOCUS_KEY    = 'wd_today_focus'
 const REC_KEY      = 'wd_recurring_done'
 const STREAK_KEY   = 'wd_streak'
-const TODAY        = new Date().toISOString().slice(0, 10)
-const YESTERDAY    = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+function localISO(date = new Date()) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+const TODAY     = localISO()
+const YESTERDAY = localISO(new Date(Date.now() - 86400000))
 
 function getFocusIds() {
   try { return JSON.parse(localStorage.getItem(FOCUS_KEY) || '[]') } catch { return [] }

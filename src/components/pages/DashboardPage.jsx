@@ -6,7 +6,13 @@ import { getStreak } from './TasksPage'
 
 const GCAL_AGENDA = 'https://calendar.google.com/calendar/embed?src=shaniah%40promotableyou.com.au&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA'
 
-const TODAY = new Date().toISOString().slice(0, 10)
+function localISO(date = new Date()) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+const TODAY = localISO()
 
 function greeting() {
   const h = new Date().getHours()
