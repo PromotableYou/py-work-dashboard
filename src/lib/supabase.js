@@ -370,3 +370,41 @@ export async function deleteRosterRow(id) {
   const { error } = await supabase.from('wd_roster').delete().eq('id', id)
   if (error) throw error
 }
+
+// ─── ROSTER BLOCKS (drag-and-drop sessions) ───────────────────────────────────
+export async function getRosterBlocks(weekStart) {
+  const { data, error } = await supabase
+    .from('wd_roster_blocks').select('*')
+    .eq('week_start', weekStart)
+    .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+export async function addRosterBlock(block) {
+  const { data, error } = await supabase
+    .from('wd_roster_blocks').insert([block]).select().single()
+  if (error) throw error
+  return data
+}
+export async function deleteRosterBlock(id) {
+  const { error } = await supabase.from('wd_roster_blocks').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ─── SESSION TYPES ────────────────────────────────────────────────────────────
+export async function getSessionTypes() {
+  const { data, error } = await supabase
+    .from('wd_session_types').select('*').order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+export async function addSessionType(st) {
+  const { data, error } = await supabase
+    .from('wd_session_types').insert([st]).select().single()
+  if (error) throw error
+  return data
+}
+export async function deleteSessionType(id) {
+  const { error } = await supabase.from('wd_session_types').delete().eq('id', id)
+  if (error) throw error
+}
