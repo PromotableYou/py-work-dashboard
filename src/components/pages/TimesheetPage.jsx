@@ -1,38 +1,25 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, AlertCircle, Clock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, AlertCircle, Check } from 'lucide-react'
 import { getTimelog, upsertTimelogRow } from '../../lib/supabase'
 
 const STD_HOURS = 7.6
-const SHORT_THRESHOLD = 0.25 // 15 mins in hours
 
 const DAY_TYPES = ['Normal', 'Annual Leave', 'Sick Leave', 'Personal Leave', 'Public Holiday', 'Unpaid Leave', 'RDO']
 
 const TYPE_STYLE = {
-  'Normal':         'bg-white',
-  'Annual Leave':   'bg-emerald-50',
-  'Sick Leave':     'bg-blush-50',
-  'Personal Leave': 'bg-purple-50',
-  'Public Holiday': 'bg-blue-50',
-  'Unpaid Leave':   'bg-sand-100',
-  'RDO':            'bg-amber-50',
+  'Normal':         { card: 'bg-white border-sand-200',         badge: 'bg-sand-100 text-sand-600'          },
+  'Annual Leave':   { card: 'bg-emerald-50 border-emerald-200', badge: 'bg-emerald-100 text-emerald-700'    },
+  'Sick Leave':     { card: 'bg-blush-50 border-blush-200',     badge: 'bg-blush-100 text-blush-700'        },
+  'Personal Leave': { card: 'bg-purple-50 border-purple-200',   badge: 'bg-purple-100 text-purple-700'      },
+  'Public Holiday': { card: 'bg-blue-50 border-blue-200',       badge: 'bg-blue-100 text-blue-700'          },
+  'Unpaid Leave':   { card: 'bg-sand-100 border-sand-300',      badge: 'bg-sand-200 text-sand-700'          },
+  'RDO':            { card: 'bg-amber-50 border-amber-200',     badge: 'bg-amber-100 text-amber-700'        },
 }
 
-const TYPE_BADGE = {
-  'Normal':         'bg-sand-100 text-sand-600',
-  'Annual Leave':   'bg-emerald-100 text-emerald-700',
-  'Sick Leave':     'bg-blush-100 text-blush-700',
-  'Personal Leave': 'bg-purple-100 text-purple-700',
-  'Public Holiday': 'bg-blue-100 text-blue-700',
-  'Unpaid Leave':   'bg-sand-200 text-sand-700',
-  'RDO':            'bg-amber-100 text-amber-700',
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function getMostRecentFortnight() {
-  // Find the most recent Monday that falls on a fortnightly cycle
-  // For simplicity: find last Monday
   const today = new Date()
-  const day = today.getDay() // 0=Sun
+  const day = today.getDay()
   const diffToMon = day === 0 ? -6 : 1 - day
   const lastMon = new Date(today)
   lastMon.setDate(today.getDate() + diffToMon)
@@ -41,232 +28,179 @@ function getMostRecentFortnight() {
 }
 
 function addDays(date, n) {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
+  const d = new Date(date); d.setDate(d.getDate() + n); return d
 }
 
-function toISO(date) {
-  return date.toISOString().slice(0, 10)
-}
+function toISO(date) { return date.toISOString().slice(0, 10) }
 
-function parseTime(t) {
-  // "09:00" → decimal hours
-  if (!t) return null
-  const [h, m] = t.split(':').map(Number)
-  return h + m / 60
-}
-
-function calcHours(clockIn, clockOut, type) {
-  if (type !== 'Normal') return STD_HOURS
-  const inH = parseTime(clockIn)
-  const outH = parseTime(clockOut)
-  if (inH === null || outH === null) return null
-  return Math.max(0, outH - inH)
-}
-
-function fmtHours(h) {
-  if (h === null || h === undefined) return '—'
-  const hrs = Math.floor(h)
-  const mins = Math.round((h - hrs) * 60)
-  if (mins === 0) return `${hrs}h`
-  if (hrs === 0) return `${mins}m`
-  return `${hrs}h ${mins}m`
-}
-
-function isShort(workedHours) {
-  if (workedHours === null || workedHours === undefined) return false
-  return workedHours < STD_HOURS - SHORT_THRESHOLD
-}
-
-// Build the 10 working-day grid for a fortnight starting on `startMon`
 function buildFortnight(startMon) {
   const days = []
-  for (let week = 0; week < 2; week++) {
+  for (let week = 0; week < 2; week++)
     for (let d = 0; d < 5; d++) {
       const date = addDays(startMon, week * 7 + d)
-      days.push({
-        date: toISO(date),
-        dayName: date.toLocaleDateString('en-AU', { weekday: 'long' }),
-        weekNum: week,
-      })
+      days.push({ date: toISO(date), dayName: date.toLocaleDateString('en-AU', { weekday: 'long' }), weekNum: week })
     }
-  }
   return days
 }
 
-// ─── Row component ────────────────────────────────────────────────────────────
-function DayRow({ day, row, onChange, isToday }) {
-  const workedHours = calcHours(row.clock_in, row.clock_out, row.type)
-  const short = row.type === 'Normal' && isShort(workedHours)
-  const underAmt = short ? (STD_HOURS - workedHours) : null
-  const isNormal = row.type === 'Normal'
+// "worked" = clock_in field is non-empty (we store a sentinel)
+function isWorked(row) { return !!(row.clock_in) }
+function workedHours(row) {
+  if (!isWorked(row)) return 0
+  return STD_HOURS
+}
 
-  const rowBg = short
-    ? 'bg-blush-50 border-blush-200'
-    : TYPE_STYLE[row.type] || 'bg-white'
+// ─── Day card ─────────────────────────────────────────────────────────────────
+function DayCard({ day, row, onChange, isToday }) {
+  const worked  = isWorked(row)
+  const type    = row.type || 'Normal'
+  const styles  = TYPE_STYLE[type] || TYPE_STYLE['Normal']
+  const isLeave = type !== 'Normal'
+
+  function toggleWorked() {
+    if (worked) {
+      onChange({ clock_in: '', clock_out: '' })
+    } else {
+      onChange({ clock_in: '09:00', clock_out: '17:00', type: 'Normal' })
+    }
+  }
 
   return (
-    <tr className={`border-b border-sand-100 transition-colors ${rowBg} ${isToday ? 'ring-2 ring-inset ring-blush-300' : ''}`}>
-      {/* Day */}
-      <td className="px-3 py-2.5 text-xs text-sand-500 whitespace-nowrap">
-        <div className="font-medium text-sand-700">{day.dayName.slice(0, 3)}</div>
-        <div className="text-[10px] text-sand-400">{new Date(day.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>
-      </td>
+    <div className={`relative flex flex-col rounded-2xl border-2 p-4 transition-all ${styles.card} ${
+      isToday ? 'ring-2 ring-blush-400 ring-offset-1' : ''
+    } ${worked || isLeave ? 'shadow-sm' : 'opacity-70'}`}>
 
-      {/* Std Hrs */}
-      <td className="px-3 py-2.5 text-xs text-center text-sand-500">{STD_HOURS}</td>
+      {/* Today pill */}
+      {isToday && (
+        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-blush-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap">
+          Today
+        </span>
+      )}
 
-      {/* Type */}
-      <td className="px-3 py-2.5">
-        <select
-          value={row.type}
-          onChange={e => onChange({ type: e.target.value })}
-          className={`text-xs rounded-lg px-2 py-1 border border-sand-200 focus:ring-2 focus:ring-blush-300 focus:outline-none cursor-pointer ${TYPE_BADGE[row.type] || ''}`}
+      {/* Day + date */}
+      <p className="text-xs font-bold text-sand-700 text-center">{day.dayName.slice(0, 3).toUpperCase()}</p>
+      <p className="text-[10px] text-sand-400 text-center mt-0.5">
+        {new Date(day.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+      </p>
+
+      {/* Big tick */}
+      <div className="flex justify-center my-3">
+        <button
+          onClick={toggleWorked}
+          className={`w-12 h-12 rounded-2xl border-2 flex items-center justify-center transition-all ${
+            worked
+              ? 'bg-blush-500 border-blush-500 shadow-md shadow-blush-200 scale-105'
+              : isLeave
+              ? 'bg-sand-100 border-sand-200 cursor-default'
+              : 'border-sand-200 hover:border-blush-300 hover:bg-blush-50'
+          }`}
         >
-          {DAY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          {(worked || isLeave) && <Check className={`w-6 h-6 ${worked ? 'text-white' : 'text-sand-400'}`} />}
+        </button>
+      </div>
+
+      {/* Type badge / selector */}
+      <div className="flex justify-center">
+        <select
+          value={type}
+          onChange={e => onChange({ type: e.target.value, clock_in: e.target.value === 'Normal' ? (worked ? '09:00' : '') : '09:00', clock_out: e.target.value === 'Normal' ? (worked ? '17:00' : '') : '17:00' })}
+          className={`text-[10px] font-semibold px-2 py-1 rounded-lg border-0 focus:ring-2 focus:ring-blush-300 focus:outline-none cursor-pointer text-center appearance-none ${styles.badge}`}
+        >
+          {DAY_TYPES.map(t => <option key={t} value={t}>{t === 'Normal' ? (worked ? 'Worked' : 'Not worked') : t}</option>)}
         </select>
-      </td>
-
-      {/* Clock In */}
-      <td className="px-3 py-2.5">
-        {isNormal ? (
-          <input
-            type="time"
-            value={row.clock_in || ''}
-            onChange={e => onChange({ clock_in: e.target.value })}
-            className="text-xs bg-white border border-sand-200 rounded-lg px-2 py-1 text-sand-800 focus:ring-2 focus:ring-blush-300 focus:outline-none w-24"
-          />
-        ) : <span className="text-xs text-sand-300 px-2">—</span>}
-      </td>
-
-      {/* Clock Out */}
-      <td className="px-3 py-2.5">
-        {isNormal ? (
-          <input
-            type="time"
-            value={row.clock_out || ''}
-            onChange={e => onChange({ clock_out: e.target.value })}
-            className="text-xs bg-white border border-sand-200 rounded-lg px-2 py-1 text-sand-800 focus:ring-2 focus:ring-blush-300 focus:outline-none w-24"
-          />
-        ) : <span className="text-xs text-sand-300 px-2">—</span>}
-      </td>
-
-      {/* Hours Worked */}
-      <td className={`px-3 py-2.5 text-xs text-center font-semibold ${
-        short ? 'text-blush-600' : 'text-sand-700'
-      }`}>
-        {fmtHours(workedHours)}
-      </td>
-
-      {/* Under Std */}
-      <td className={`px-3 py-2.5 text-xs text-center ${short ? 'text-blush-600 font-semibold' : 'text-sand-300'}`}>
-        {short ? `-${fmtHours(underAmt)}` : '—'}
-      </td>
+      </div>
 
       {/* Notes */}
-      <td className="px-3 py-2.5 min-w-[140px]">
-        <input
-          value={row.notes || ''}
-          onChange={e => onChange({ notes: e.target.value })}
-          placeholder="Coaching, 1:1s…"
-          className="w-full text-xs bg-transparent border-b border-sand-200 py-1 text-sand-700 placeholder-sand-300 focus:outline-none focus:border-blush-400"
-        />
-      </td>
-    </tr>
+      <input
+        value={row.notes || ''}
+        onChange={e => onChange({ notes: e.target.value })}
+        placeholder="Notes…"
+        className="mt-2.5 w-full text-[11px] bg-white/60 border border-sand-200 rounded-lg px-2 py-1.5 text-sand-700 placeholder-sand-300 focus:outline-none focus:ring-2 focus:ring-blush-200"
+      />
+    </div>
   )
 }
 
-// ─── Totals row ───────────────────────────────────────────────────────────────
-function TotalsRow({ label, rows, colSpan = false }) {
-  const total = rows.reduce((sum, r) => {
-    const h = calcHours(r.clock_in, r.clock_out, r.type)
-    return sum + (h || STD_HOURS)
-  }, 0)
+// ─── Week summary bar ─────────────────────────────────────────────────────────
+function WeekBar({ label, days, rows }) {
+  const worked  = days.filter(d => isWorked(rows[d.date] || {})).length
+  const leave   = days.filter(d => { const r = rows[d.date]; return r && !isWorked(r) && r.type !== 'Normal' }).length
+  const total   = worked + leave
+  const hours   = days.reduce((s, d) => s + workedHours(rows[d.date] || {}), 0)
+
   return (
-    <tr className="bg-sand-100 border-b-2 border-sand-300">
-      <td className="px-3 py-2 text-xs font-bold text-sand-700 uppercase tracking-wide" colSpan={3}>{label}</td>
-      <td className="px-3 py-2 text-xs text-sand-400 text-center">{STD_HOURS * rows.length}</td>
-      <td />
-      <td className="px-3 py-2 text-xs font-bold text-sand-800 text-center">{fmtHours(total)}</td>
-      <td className="px-3 py-2 text-xs font-bold text-blush-600 text-center">
-        {total < STD_HOURS * rows.length - 0.1 ? `-${fmtHours(STD_HOURS * rows.length - total)}` : '—'}
-      </td>
-      <td />
-    </tr>
+    <div className="flex items-center justify-between px-4 py-2 bg-sand-50 rounded-xl border border-sand-200 text-xs">
+      <span className="font-bold text-sand-600 uppercase tracking-wide">{label}</span>
+      <div className="flex items-center gap-4">
+        <span className="text-sand-500">{total}/5 days</span>
+        <span className="font-semibold text-blush-600">{hours.toFixed(1)}h</span>
+      </div>
+    </div>
   )
 }
 
 // ─── Pay Summary ──────────────────────────────────────────────────────────────
-function PaySummary({ allRows }) {
+function PaySummary({ fortnight, rows }) {
+  const allRows = fortnight.map(d => ({ ...(rows[d.date] || { type: 'Normal' }), date: d.date }))
+  const totalHours = allRows.reduce((s, r) => s + workedHours(r), 0)
+  const workedDays = allRows.filter(r => isWorked(r)).length
+  const leaveDays  = allRows.filter(r => !isWorked(r) && r.type !== 'Normal').length
+  const offDays    = allRows.filter(r => !isWorked(r) && r.type === 'Normal').length
+
   const byType = DAY_TYPES.reduce((acc, t) => {
-    const typeRows = allRows.filter(r => r.type === t)
-    const hours = typeRows.reduce((s, r) => {
-      const h = calcHours(r.clock_in, r.clock_out, r.type)
-      return s + (h !== null ? h : STD_HOURS)
-    }, 0)
-    if (hours > 0) acc[t] = hours
+    const count = allRows.filter(r => r.type === t && (isWorked(r) || t !== 'Normal')).length
+    if (count > 0) acc[t] = count
     return acc
   }, {})
 
-  const totalWorked = allRows.reduce((s, r) => {
-    const h = calcHours(r.clock_in, r.clock_out, r.type)
-    return s + (h !== null ? h : STD_HOURS)
-  }, 0)
-
-  const underDays = allRows.filter(r => isShort(calcHours(r.clock_in, r.clock_out, r.type)))
-  const totalUnder = underDays.reduce((s, r) => {
-    const h = calcHours(r.clock_in, r.clock_out, r.type)
-    return s + (STD_HOURS - (h || 0))
-  }, 0)
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
-      {/* Hours breakdown */}
-      <div className="bg-white border border-sand-200 rounded-2xl p-4">
-        <p className="text-xs font-bold text-sand-500 uppercase tracking-wide mb-3">Pay Summary — This Fortnight</p>
-        <div className="space-y-2">
-          {Object.entries(byType).map(([type, hours]) => (
-            <div key={type} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${TYPE_BADGE[type]}`}>{type}</span>
-              </div>
-              <span className="text-sm font-semibold text-sand-800">{fmtHours(hours)}</span>
-            </div>
-          ))}
-          <div className="pt-2 mt-2 border-t border-sand-100 flex items-center justify-between">
-            <span className="text-sm font-bold text-sand-900">Total Hours</span>
-            <span className="text-sm font-bold text-blush-600">{fmtHours(totalWorked)}</span>
-          </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Big hours stat */}
+      <div className="bg-gradient-to-br from-blush-500 to-blush-400 rounded-2xl p-5 text-white">
+        <p className="text-xs font-semibold text-white/70 uppercase tracking-widest">Total Hours</p>
+        <p className="text-4xl font-bold mt-1">{totalHours.toFixed(1)}<span className="text-xl font-normal text-white/70">h</span></p>
+        <p className="text-sm text-white/70 mt-1">of {STD_HOURS * 10}h standard</p>
+        <div className="mt-3 h-1.5 bg-white/20 rounded-full overflow-hidden">
+          <div className="h-full bg-white rounded-full transition-all"
+            style={{ width: `${Math.min((totalHours / (STD_HOURS * 10)) * 100, 100)}%` }} />
         </div>
       </div>
 
-      {/* Flags */}
-      <div className="bg-white border border-sand-200 rounded-2xl p-4">
-        <p className="text-xs font-bold text-sand-500 uppercase tracking-wide mb-3">Flags / Exceptions</p>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-sand-600">Days under standard</span>
-            <span className={`text-sm font-bold ${underDays.length > 0 ? 'text-blush-600' : 'text-sand-400'}`}>{underDays.length}</span>
+      {/* Days breakdown */}
+      <div className="bg-white border border-sand-200 rounded-2xl p-5">
+        <p className="text-xs font-bold text-sand-400 uppercase tracking-widest mb-3">Days This Fortnight</p>
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-sand-600">Worked</span>
+            <span className="font-bold text-sand-900">{workedDays}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-sand-600">Total under standard</span>
-            <span className={`text-sm font-bold ${totalUnder > 0 ? 'text-blush-600' : 'text-sand-400'}`}>
-              {totalUnder > 0.05 ? `-${fmtHours(totalUnder)}` : '—'}
-            </span>
-          </div>
-          {underDays.length > 0 && (
-            <div className="pt-2 border-t border-sand-100">
-              <p className="text-xs text-sand-400 mb-1">Short days:</p>
-              {underDays.map(r => (
-                <div key={r.date} className="flex items-center justify-between text-xs">
-                  <span className="text-sand-600">{new Date(r.date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                  <span className="text-blush-600 font-medium">
-                    -{fmtHours(STD_HOURS - (calcHours(r.clock_in, r.clock_out, r.type) || 0))}
-                  </span>
-                </div>
-              ))}
+          {leaveDays > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-sand-600">Leave / Public holiday</span>
+              <span className="font-bold text-emerald-600">{leaveDays}</span>
             </div>
+          )}
+          {offDays > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-sand-600">Not logged</span>
+              <span className="font-bold text-sand-400">{offDays}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Type breakdown */}
+      <div className="bg-white border border-sand-200 rounded-2xl p-5">
+        <p className="text-xs font-bold text-sand-400 uppercase tracking-widest mb-3">By Type</p>
+        <div className="space-y-2">
+          {Object.entries(byType).map(([type, count]) => (
+            <div key={type} className="flex items-center justify-between">
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${TYPE_STYLE[type]?.badge || ''}`}>{type}</span>
+              <span className="text-sm font-bold text-sand-700">{count}d</span>
+            </div>
+          ))}
+          {Object.keys(byType).length === 0 && (
+            <p className="text-xs text-sand-300">Nothing logged yet</p>
           )}
         </div>
       </div>
@@ -274,24 +208,23 @@ function PaySummary({ allRows }) {
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function TimesheetPage() {
   const [cycleStart, setCycleStart] = useState(getMostRecentFortnight)
-  const [rows, setRows] = useState({}) // keyed by date string
+  const [rows, setRows]     = useState({})
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState({})
-  const [error, setError] = useState(null)
+  const [error, setError]   = useState(null)
 
   const fortnight = buildFortnight(cycleStart)
-  const todayISO = toISO(new Date())
+  const todayISO  = toISO(new Date())
+  const week1     = fortnight.slice(0, 5)
+  const week2     = fortnight.slice(5, 10)
+
+  const cycleLabel = `${cycleStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} — ${addDays(cycleStart, 13).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
   useEffect(() => {
     getTimelog()
-      .then(data => {
-        const map = {}
-        data.forEach(r => { map[r.date] = r })
-        setRows(map)
-      })
+      .then(data => { const m = {}; data.forEach(r => { m[r.date] = r }); setRows(m) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -301,32 +234,13 @@ export default function TimesheetPage() {
   }
 
   const handleChange = useCallback(async (date, updates) => {
-    const current = getRow(date)
-    const updated = { ...current, ...updates }
+    const updated = { ...getRow(date), ...updates }
     setRows(prev => ({ ...prev, [date]: updated }))
-    setSaving(prev => ({ ...prev, [date]: true }))
     try {
       const saved = await upsertTimelogRow(updated)
       setRows(prev => ({ ...prev, [date]: saved }))
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setSaving(prev => ({ ...prev, [date]: false }))
-    }
+    } catch (e) { setError(e.message) }
   }, [rows])
-
-  function prevCycle() {
-    setCycleStart(d => { const n = new Date(d); n.setDate(n.getDate() - 14); return n })
-  }
-  function nextCycle() {
-    setCycleStart(d => { const n = new Date(d); n.setDate(n.getDate() + 14); return n })
-  }
-
-  const week1 = fortnight.slice(0, 5)
-  const week2 = fortnight.slice(5, 10)
-  const allRowData = fortnight.map(d => getRow(d.date))
-
-  const cycleLabel = `${cycleStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} — ${addDays(cycleStart, 13).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -335,23 +249,23 @@ export default function TimesheetPage() {
   )
 
   return (
-    <div className="space-y-5 pb-6">
+    <div className="space-y-6 pb-6">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-sand-900">Time Log</h1>
           <p className="text-sand-400 text-sm mt-0.5">Shaniah — {cycleLabel}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-white border border-sand-200 rounded-xl p-1">
-            <button onClick={prevCycle} className="w-7 h-7 rounded-lg hover:bg-sand-100 flex items-center justify-center text-sand-600 transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-xs font-medium text-sand-700 px-2 whitespace-nowrap">{cycleLabel}</span>
-            <button onClick={nextCycle} className="w-7 h-7 rounded-lg hover:bg-sand-100 flex items-center justify-center text-sand-600 transition-colors">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="flex items-center gap-1 bg-white border border-sand-200 rounded-xl p-1">
+          <button onClick={() => setCycleStart(d => { const n = new Date(d); n.setDate(n.getDate() - 14); return n })}
+            className="w-7 h-7 rounded-lg hover:bg-sand-100 flex items-center justify-center text-sand-600 transition-colors">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs font-medium text-sand-700 px-2 whitespace-nowrap">{cycleLabel}</span>
+          <button onClick={() => setCycleStart(d => { const n = new Date(d); n.setDate(n.getDate() + 14); return n })}
+            className="w-7 h-7 rounded-lg hover:bg-sand-100 flex items-center justify-center text-sand-600 transition-colors">
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -361,90 +275,32 @@ export default function TimesheetPage() {
         </div>
       )}
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs text-sand-400">Type colours:</span>
-        {Object.entries(TYPE_BADGE).filter(([t]) => t !== 'Normal').map(([type, cls]) => (
-          <span key={type} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${cls}`}>{type}</span>
-        ))}
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blush-100 text-blush-700">Short day (pink row)</span>
+      {/* Week 1 */}
+      <div className="space-y-3">
+        <p className="text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 1</p>
+        <div className="grid grid-cols-5 gap-3">
+          {week1.map(d => (
+            <DayCard key={d.date} day={d} row={getRow(d.date)}
+              onChange={u => handleChange(d.date, u)} isToday={d.date === todayISO} />
+          ))}
+        </div>
+        <WeekBar label="Week 1" days={week1} rows={rows} />
       </div>
 
-      {/* Timesheet table */}
-      <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-sand-100 bg-sand-50">
-          <h2 className="text-sm font-semibold text-sand-700">Pay Cycle — {cycleLabel}</h2>
+      {/* Week 2 */}
+      <div className="space-y-3">
+        <p className="text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 2</p>
+        <div className="grid grid-cols-5 gap-3">
+          {week2.map(d => (
+            <DayCard key={d.date} day={d} row={getRow(d.date)}
+              onChange={u => handleChange(d.date, u)} isToday={d.date === todayISO} />
+          ))}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-sand-200 bg-sand-50">
-                {['Day / Date', 'Std Hrs', 'Type', 'Clock In', 'Clock Out', 'Hours Worked', 'Under Std', 'Notes'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left text-[10px] font-bold text-sand-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Week 1 */}
-              <tr className="bg-blush-50/50">
-                <td colSpan={8} className="px-3 py-1.5 text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 1</td>
-              </tr>
-              {week1.map(d => (
-                <DayRow
-                  key={d.date}
-                  day={d}
-                  row={getRow(d.date)}
-                  onChange={updates => handleChange(d.date, updates)}
-                  isToday={d.date === todayISO}
-                />
-              ))}
-              <TotalsRow label="Week 1 Total" rows={week1.map(d => getRow(d.date))} />
-
-              {/* Week 2 */}
-              <tr className="bg-blush-50/50">
-                <td colSpan={8} className="px-3 py-1.5 text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 2</td>
-              </tr>
-              {week2.map(d => (
-                <DayRow
-                  key={d.date}
-                  day={d}
-                  row={getRow(d.date)}
-                  onChange={updates => handleChange(d.date, updates)}
-                  isToday={d.date === todayISO}
-                />
-              ))}
-              <TotalsRow label="Week 2 Total" rows={week2.map(d => getRow(d.date))} />
-
-              {/* Pay cycle total */}
-              <tr className="bg-blush-100 border-t-2 border-blush-300">
-                <td className="px-3 py-2.5 text-xs font-bold text-blush-800 uppercase tracking-wide" colSpan={3}>Pay Cycle Total</td>
-                <td className="px-3 py-2.5 text-xs text-blush-600 text-center font-semibold">{STD_HOURS * 10}</td>
-                <td />
-                <td className="px-3 py-2.5 text-xs font-bold text-blush-800 text-center">
-                  {fmtHours(allRowData.reduce((s, r) => s + (calcHours(r.clock_in, r.clock_out, r.type) ?? STD_HOURS), 0))}
-                </td>
-                <td className="px-3 py-2.5 text-xs font-bold text-blush-700 text-center">
-                  {(() => {
-                    const total = allRowData.reduce((s, r) => s + (calcHours(r.clock_in, r.clock_out, r.type) ?? STD_HOURS), 0)
-                    const diff = STD_HOURS * 10 - total
-                    return diff > 0.1 ? `-${fmtHours(diff)}` : '—'
-                  })()}
-                </td>
-                <td />
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <WeekBar label="Week 2" days={week2} rows={rows} />
       </div>
 
-      {/* Pay Summary + Flags */}
-      <PaySummary allRows={allRowData} />
-
-      {/* Auto-save note */}
-      <p className="text-xs text-sand-400 text-center">
-        <Clock className="w-3 h-3 inline mr-1" />
-        Changes save automatically as you type
-      </p>
+      {/* Pay summary */}
+      <PaySummary fortnight={fortnight} rows={rows} />
     </div>
   )
 }
