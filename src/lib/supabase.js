@@ -65,6 +65,36 @@ export async function deleteProject(id) {
   if (error) throw error
 }
 
+// ─── SUBTASKS ─────────────────────────────────────────────────────────────────
+export async function getSubtasks() {
+  const { data, error } = await supabase
+    .from('wd_subtasks')
+    .select('*')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function addSubtask(subtask) {
+  const { data, error } = await supabase
+    .from('wd_subtasks')
+    .insert([subtask])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateSubtask(id, updates) {
+  const { error } = await supabase.from('wd_subtasks').update(updates).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteSubtask(id) {
+  const { error } = await supabase.from('wd_subtasks').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ─── CALENDAR ────────────────────────────────────────────────────────────────
 export async function getEvents() {
   const { data, error } = await supabase
