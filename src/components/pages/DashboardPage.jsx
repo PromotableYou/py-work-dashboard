@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckSquare, Calendar, Lightbulb, Brain, Clock, ArrowRight, TrendingUp, Zap, Star, AlertCircle } from 'lucide-react'
+import { CheckSquare, Calendar, Lightbulb, Brain, Clock, ArrowRight, TrendingUp, Zap, Star, AlertCircle, Flame } from 'lucide-react'
 import { getTasks, getProjects, getSubtasks, getDumps, getIdeas, getTimelog } from '../../lib/supabase'
+import { getStreak } from './TasksPage'
 
 const GCAL_AGENDA = 'https://calendar.google.com/calendar/embed?src=shaniah%40promotableyou.com.au&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA'
 
@@ -50,6 +51,7 @@ export default function DashboardPage() {
   )
 
   const { tasks, projects, subtasks, dumps, ideas, timelog } = data
+  const streak = getStreak()
 
   // Stats
   const todayTasks = tasks.filter(t => t.type === 'daily' && t.date === TODAY)
@@ -95,7 +97,15 @@ export default function DashboardPage() {
           <p className="text-white/70 text-sm font-medium">
             {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
-          <h1 className="text-4xl font-bold mt-1">{greeting()}, Shaniah 👋</h1>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            <h1 className="text-4xl font-bold">{greeting()}, Shaniah 👋</h1>
+            {streak.current > 0 && (
+              <span className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-sm font-bold text-white border border-white/30">
+                <Flame className="w-4 h-4 text-orange-300" />
+                {streak.current} day streak{streak.current >= streak.best && streak.best > 1 ? ' 🏆' : ''}
+              </span>
+            )}
+          </div>
           <p className="text-white/80 mt-2 text-base">
             {todayTasks.length === 0
               ? "You're all clear — add some tasks to get started."

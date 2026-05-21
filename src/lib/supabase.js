@@ -170,6 +170,31 @@ export async function deleteDump(id) {
   if (error) throw error
 }
 
+// ─── RECURRING TASKS ─────────────────────────────────────────────────────────
+export async function getRecurringTasks() {
+  const { data, error } = await supabase
+    .from('wd_recurring_tasks')
+    .select('*')
+    .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function addRecurringTask(text) {
+  const { data, error } = await supabase
+    .from('wd_recurring_tasks')
+    .insert([{ text, sort_order: Date.now() }])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteRecurringTask(id) {
+  const { error } = await supabase.from('wd_recurring_tasks').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ─── TIMELOG (pay-cycle timesheet) ───────────────────────────────────────────
 export async function getTimelog() {
   const { data, error } = await supabase
