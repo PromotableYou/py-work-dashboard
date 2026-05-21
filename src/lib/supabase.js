@@ -18,7 +18,7 @@ export async function getTasks() {
 export async function addTask(task) {
   const { data, error } = await supabase
     .from('wd_tasks')
-    .insert([task])
+    .insert([{ ...task, project_id: task.project_id || null }])
     .select()
     .single()
   if (error) throw error

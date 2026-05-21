@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom'
-import { Sun, Calendar, Lightbulb, Brain, Clock } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock } from 'lucide-react'
 
 const links = [
-  { to: '/',          icon: Sun,       label: 'Today'      },
-  { to: '/calendar',  icon: Calendar,  label: 'Calendar'   },
-  { to: '/ideas',     icon: Lightbulb, label: 'Ideas'      },
-  { to: '/dump',      icon: Brain,     label: 'Brain Dump' },
-  { to: '/timesheet', icon: Clock,     label: 'Timesheet'  },
+  { to: '/',          icon: LayoutDashboard, label: 'Dashboard'  },
+  { to: '/tasks',     icon: CheckSquare,     label: 'Tasks'      },
+  { to: '/calendar',  icon: Calendar,        label: 'Calendar'   },
+  { to: '/ideas',     icon: Lightbulb,       label: 'Ideas'      },
+  { to: '/dump',      icon: Brain,           label: 'Brain Dump' },
+  { to: '/timesheet', icon: Clock,           label: 'Timesheet'  },
 ]
 
 export default function Nav() {
