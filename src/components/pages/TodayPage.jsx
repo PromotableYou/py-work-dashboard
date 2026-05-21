@@ -22,8 +22,8 @@ function TaskItem({ task, onToggle, onDelete }) {
         onClick={() => onToggle(task)}
         className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
           task.completed
-            ? 'bg-warm-500 border-warm-500'
-            : 'border-sand-300 hover:border-warm-400'
+            ? 'bg-blush-400 border-blush-400'
+            : 'border-sand-300 hover:border-blush-400'
         }`}
       >
         {task.completed && <Check className="w-3 h-3 text-white" />}
@@ -58,9 +58,9 @@ function AddTaskInput({ onAdd, placeholder = 'Add a task…', asType = 'daily', 
         value={text}
         onChange={e => setText(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-2 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-warm-300 focus:border-warm-400 transition-all"
+        className="flex-1 text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-2 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-blush-200 focus:border-blush-400 transition-all"
       />
-      <button type="submit" className="w-8 h-8 bg-warm-500 hover:bg-warm-600 text-white rounded-lg flex items-center justify-center transition-colors shrink-0">
+      <button type="submit" className="w-8 h-8 bg-blush-500 hover:bg-blush-600 text-white rounded-lg flex items-center justify-center transition-colors shrink-0">
         <Plus className="w-4 h-4" />
       </button>
     </form>
@@ -82,7 +82,7 @@ function ProjectCard({ project, onToggle, onDelete }) {
           <button
             onClick={() => onToggle(project)}
             className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-              project.done ? 'bg-warm-500 border-warm-500' : 'border-sand-300 hover:border-warm-400'
+              project.done ? 'bg-blush-400 border-blush-400' : 'border-sand-300 hover:border-blush-400'
             }`}
           >
             {project.done && <Check className="w-3 h-3 text-white" />}
@@ -175,7 +175,7 @@ export default function TodayPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-6 h-6 border-2 border-warm-400 border-t-transparent rounded-full animate-spin" />
+      <div className="w-6 h-6 border-2 border-blush-400 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -212,7 +212,7 @@ export default function TodayPage() {
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 bg-warm-100 rounded-lg flex items-center justify-center">
-                  <Check className="w-4 h-4 text-warm-600" />
+                  <Check className="w-4 h-4 text-blush-600" />
                 </div>
                 <h2 className="font-semibold text-sand-900">Today's Tasks</h2>
               </div>
@@ -230,7 +230,7 @@ export default function TodayPage() {
             {dailyTasks.length > 0 && (
               <div className="h-1.5 bg-sand-100 rounded-full mt-3 mb-1 overflow-hidden">
                 <div
-                  className="h-full bg-warm-400 rounded-full transition-all duration-500"
+                  className="h-full bg-blush-400 rounded-full transition-all duration-500"
                   style={{ width: `${(doneCount / dailyTasks.length) * 100}%` }}
                 />
               </div>
@@ -304,13 +304,13 @@ export default function TodayPage() {
                   value={newProject.name}
                   onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
                   placeholder="Project name…"
-                  className="w-full text-sm bg-white border border-sand-200 rounded-lg px-3 py-2 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-warm-300"
+                  className="w-full text-sm bg-white border border-sand-200 rounded-lg px-3 py-2 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-blush-200"
                 />
                 <input
                   value={newProject.notes}
                   onChange={e => setNewProject(p => ({ ...p, notes: e.target.value }))}
                   placeholder="Notes (optional)…"
-                  className="w-full text-sm bg-white border border-sand-200 rounded-lg px-3 py-2 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-warm-300"
+                  className="w-full text-sm bg-white border border-sand-200 rounded-lg px-3 py-2 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-blush-200"
                 />
                 <div className="flex gap-2">
                   {['high', 'medium', 'low'].map(p => (
@@ -330,7 +330,7 @@ export default function TodayPage() {
                     </button>
                   ))}
                 </div>
-                <button type="submit" className="w-full bg-warm-500 hover:bg-warm-600 text-white text-sm font-medium py-2 rounded-lg transition-colors">
+                <button type="submit" className="w-full bg-blush-500 hover:bg-blush-600 text-white text-sm font-medium py-2 rounded-lg transition-colors">
                   Add Project
                 </button>
               </form>

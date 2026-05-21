@@ -27,7 +27,7 @@ export default function Nav() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-warm-50 text-warm-700 border border-warm-200'
+                    ? 'bg-blush-50 text-blush-700 border border-blush-200'
                     : 'text-sand-600 hover:bg-sand-100 hover:text-sand-900'
                 }`
               }
@@ -53,7 +53,7 @@ export default function Nav() {
             end={to === '/'}
             className={({ isActive }) =>
               `flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
-                isActive ? 'text-warm-600' : 'text-sand-400'
+                isActive ? 'text-blush-500' : 'text-sand-400'
               }`
             }
           >

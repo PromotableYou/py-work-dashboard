@@ -140,27 +140,28 @@ export async function deleteDump(id) {
   if (error) throw error
 }
 
-// ─── TIMESHEET ───────────────────────────────────────────────────────────────
-export async function getTimesheet() {
+// ─── TIMELOG (pay-cycle timesheet) ───────────────────────────────────────────
+export async function getTimelog() {
   const { data, error } = await supabase
-    .from('wd_timesheet')
+    .from('wd_timelog')
     .select('*')
-    .order('date', { ascending: false })
+    .order('date', { ascending: true })
   if (error) throw error
   return data
 }
 
-export async function addTimeEntry(entry) {
+export async function upsertTimelogRow(row) {
+  // row must include `date` (YYYY-MM-DD) as the unique key
   const { data, error } = await supabase
-    .from('wd_timesheet')
-    .insert([entry])
+    .from('wd_timelog')
+    .upsert([row], { onConflict: 'date' })
     .select()
     .single()
   if (error) throw error
   return data
 }
 
-export async function deleteTimeEntry(id) {
-  const { error } = await supabase.from('wd_timesheet').delete().eq('id', id)
+export async function deleteTimelogRow(id) {
+  const { error } = await supabase.from('wd_timelog').delete().eq('id', id)
   if (error) throw error
 }
