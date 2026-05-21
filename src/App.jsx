@@ -6,10 +6,10 @@ import CalendarPage from './components/pages/CalendarPage'
 import IdeasPage from './components/pages/IdeasPage'
 import BrainDumpPage from './components/pages/BrainDumpPage'
 import TimesheetPage from './components/pages/TimesheetPage'
-import BossDashboardPage from './components/pages/stacey.pm/BossDashboardPage'
-import MeetingsPage from './components/pages/stacey.pm/MeetingsPage'
-import TeamHoursPage from './components/pages/stacey.pm/TeamHoursPage'
-import CoachesCalendarPage from './components/pages/stacey.pm/CoachesCalendarPage'
+import BossDashboardPage from './components/pages/boss/BossDashboardPage'
+import MeetingsPage from './components/pages/boss/MeetingsPage'
+import TeamHoursPage from './components/pages/boss/TeamHoursPage'
+import CoachesCalendarPage from './components/pages/boss/CoachesCalendarPage'
 
 export default function App() {
   return (
