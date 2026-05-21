@@ -2,27 +2,28 @@ import { NavLink, Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList } from 'lucide-react'
 
 const SHANIAH_LINKS = [
-  { to: '/',          icon: LayoutDashboard, label: 'Dashboard'  },
-  { to: '/tasks',     icon: CheckSquare,     label: 'Tasks'      },
-  { to: '/calendar',  icon: Calendar,        label: 'Calendar'   },
-  { to: '/meetings',  icon: CalendarDays,    label: 'Meetings'   },
-  { to: '/roster',    icon: ClipboardList,   label: 'Roster'     },
-  { to: '/notes',     icon: StickyNote,      label: 'Notes'      },
-  { to: '/ideas',     icon: Lightbulb,       label: 'Ideas'      },
-  { to: '/dump',      icon: Brain,           label: 'Brain Dump' },
-  { to: '/timesheet', icon: Clock,           label: 'Timesheet'  },
+  { to: '/',                    icon: LayoutDashboard, label: 'Dashboard'   },
+  { to: '/tasks',               icon: CheckSquare,     label: 'Tasks'       },
+  { to: '/calendar',            icon: Calendar,        label: 'Calendar'    },
+  { to: '/meetings',            icon: CalendarDays,    label: 'Meetings'    },
+  { to: '/coaches-calendar',    icon: CalendarRange,   label: 'Coaches Cal' },
+  { to: '/roster',              icon: ClipboardList,   label: 'Roster'      },
+  { to: '/notes',               icon: StickyNote,      label: 'Notes'       },
+  { to: '/ideas',               icon: Lightbulb,       label: 'Ideas'       },
+  { to: '/dump',                icon: Brain,           label: 'Brain Dump'  },
+  { to: '/timesheet',           icon: Clock,           label: 'Timesheet'   },
 ]
 
 const BOSS_LINKS = [
-  { to: '/stacey',                   icon: LayoutDashboard, label: 'Dashboard'        },
-  { to: '/stacey/tasks',             icon: CheckSquare,     label: 'Tasks'            },
-  { to: '/stacey/calendar',          icon: Calendar,        label: 'Calendar'         },
-  { to: '/stacey/meetings',          icon: CalendarDays,    label: 'Meetings'         },
-  { to: '/stacey/coaches-calendar',  icon: CalendarRange,   label: 'Coaches Cal'      },
-  { to: '/stacey/notes',             icon: StickyNote,      label: 'Notes'            },
-  { to: '/stacey/ideas',             icon: Lightbulb,       label: 'Ideas'            },
-  { to: '/stacey/dump',              icon: Brain,           label: 'Brain Dump'       },
-  { to: '/stacey/team-hours',        icon: Users,           label: 'Team Hours'       },
+  { to: '/stacey',                    icon: LayoutDashboard, label: 'Dashboard'   },
+  { to: '/stacey/tasks',              icon: CheckSquare,     label: 'Tasks'       },
+  { to: '/stacey/calendar',           icon: Calendar,        label: 'Calendar'    },
+  { to: '/stacey/meetings',           icon: CalendarDays,    label: 'Meetings'    },
+  { to: '/stacey/coaches-calendar',   icon: CalendarRange,   label: 'Coaches Cal' },
+  { to: '/stacey/notes',              icon: StickyNote,      label: 'Notes'       },
+  { to: '/stacey/ideas',              icon: Lightbulb,       label: 'Ideas'       },
+  { to: '/stacey/dump',               icon: Brain,           label: 'Brain Dump'  },
+  { to: '/stacey/team-hours',         icon: Users,           label: 'Team Hours'  },
 ]
 
 export default function Nav() {

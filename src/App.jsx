@@ -31,6 +31,7 @@ export default function App() {
               <Route path="/meetings" element={<MeetingsPage workspace="shaniah" />} />
               <Route path="/notes" element={<NotesPage workspace="shaniah" />} />
               <Route path="/roster" element={<RosterPage />} />
+              <Route path="/coaches-calendar" element={<CoachesCalendarPage />} />
               {/* Stacey */}
               <Route path="/stacey" element={<BossDashboardPage />} />
               <Route path="/stacey/tasks" element={<TasksPage workspace="stacey" />} />
