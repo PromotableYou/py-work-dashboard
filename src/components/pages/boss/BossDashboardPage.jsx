@@ -157,7 +157,7 @@ export default function BossDashboardPage() {
             <h2 className="font-semibold text-sand-900 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-blush-400" /> Active Projects
             </h2>
-            <a href="/stacey.pm/tasks" className="text-xs text-blush-500 hover:text-blush-600 font-medium">View all →</a>
+            <a href="/stacey/tasks" className="text-xs text-blush-500 hover:text-blush-600 font-medium">View all →</a>
           </div>
 
           {activeProjects.length === 0 ? (
@@ -188,7 +188,7 @@ export default function BossDashboardPage() {
             <h2 className="font-semibold text-sand-900 flex items-center gap-2">
               <CalendarDays className="w-4 h-4 text-warm-400" /> Upcoming Meetings
             </h2>
-            <a href="/stacey.pm/meetings" className="text-xs text-blush-500 hover:text-blush-600 font-medium">View all →</a>
+            <a href="/stacey/meetings" className="text-xs text-blush-500 hover:text-blush-600 font-medium">View all →</a>
           </div>
 
           {upcomingMeetings.length === 0 ? (
@@ -221,7 +221,7 @@ export default function BossDashboardPage() {
             <h2 className="font-semibold text-sand-900 flex items-center gap-2">
               <Clock className="w-4 h-4 text-purple-400" /> Team Hours This Pay Period
             </h2>
-            <a href="/stacey.pm/team-hours" className="text-xs text-blush-500 hover:text-blush-600 font-medium">Manage →</a>
+            <a href="/stacey/team-hours" className="text-xs text-blush-500 hover:text-blush-600 font-medium">Manage →</a>
           </div>
           <p className="text-xs text-sand-400 mb-3">
             {payStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {payEnd.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}

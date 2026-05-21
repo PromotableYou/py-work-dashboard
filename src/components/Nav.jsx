@@ -12,19 +12,19 @@ const SHANIAH_LINKS = [
 ]
 
 const BOSS_LINKS = [
-  { to: '/stacey.pm',                   icon: LayoutDashboard, label: 'Dashboard'        },
-  { to: '/stacey.pm/tasks',             icon: CheckSquare,     label: 'Tasks'            },
-  { to: '/stacey.pm/calendar',          icon: Calendar,        label: 'Calendar'         },
-  { to: '/stacey.pm/meetings',          icon: CalendarDays,    label: 'Meetings'         },
-  { to: '/stacey.pm/coaches-calendar',  icon: CalendarRange,   label: 'Coach Hours'      },
-  { to: '/stacey.pm/ideas',             icon: Lightbulb,       label: 'Ideas'            },
-  { to: '/stacey.pm/dump',              icon: Brain,           label: 'Brain Dump'       },
-  { to: '/stacey.pm/team-hours',        icon: Users,           label: 'Team Hours'       },
+  { to: '/stacey',                   icon: LayoutDashboard, label: 'Dashboard'        },
+  { to: '/stacey/tasks',             icon: CheckSquare,     label: 'Tasks'            },
+  { to: '/stacey/calendar',          icon: Calendar,        label: 'Calendar'         },
+  { to: '/stacey/meetings',          icon: CalendarDays,    label: 'Meetings'         },
+  { to: '/stacey/coaches-calendar',  icon: CalendarRange,   label: 'Coach Hours'      },
+  { to: '/stacey/ideas',             icon: Lightbulb,       label: 'Ideas'            },
+  { to: '/stacey/dump',              icon: Brain,           label: 'Brain Dump'       },
+  { to: '/stacey/team-hours',        icon: Users,           label: 'Team Hours'       },
 ]
 
 export default function Nav() {
   const { pathname } = useLocation()
-  const isBoss = pathname.startsWith('/stacey.pm')
+  const isBoss = pathname.startsWith('/stacey')
   const links = isBoss ? BOSS_LINKS : SHANIAH_LINKS
 
   return (
@@ -47,7 +47,7 @@ export default function Nav() {
             Shaniah
           </Link>
           <Link
-            to="/stacey.pm"
+            to="/stacey"
             className={`flex-1 text-xs py-1.5 text-center rounded-lg font-semibold transition-all ${
               isBoss ? 'bg-white shadow-sm text-sand-900' : 'text-sand-400 hover:text-sand-700'
             }`}
@@ -61,7 +61,7 @@ export default function Nav() {
             <NavLink
               key={to}
               to={to}
-              end={to === '/' || to === '/stacey.pm'}
+              end={to === '/' || to === '/stacey'}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   isActive
@@ -89,7 +89,7 @@ export default function Nav() {
           <NavLink
             key={to}
             to={to}
-            end={to === '/' || to === '/stacey.pm'}
+            end={to === '/' || to === '/stacey'}
             className={({ isActive }) =>
               `flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors min-w-[3.5rem] ${
                 isActive ? 'text-blush-500' : 'text-sand-400'
