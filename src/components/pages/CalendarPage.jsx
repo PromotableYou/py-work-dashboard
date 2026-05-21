@@ -91,6 +91,29 @@ export default function CalendarPage() {
         </div>
       )}
 
+      {/* Google Calendar embed */}
+      <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-sand-100 flex items-center justify-between">
+          <h2 className="font-semibold text-sand-900 text-sm">Google Calendar</h2>
+          <a
+            href="https://calendar.google.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blush-500 hover:text-blush-600 font-medium"
+          >
+            Open in Google →
+          </a>
+        </div>
+        <iframe
+          src="https://calendar.google.com/calendar/embed?src=shaniah%40promotableyou.com.au&ctz=Australia%2FBrisbane&mode=WEEK&showTitle=0&showNav=1&showPrint=0&showTabs=1&showCalendars=0"
+          style={{ border: 0 }}
+          width="100%"
+          height="580"
+          frameBorder="0"
+          scrolling="no"
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Calendar grid */}
         <div className="lg:col-span-2 bg-white border border-sand-200 rounded-2xl p-5">
@@ -201,7 +224,7 @@ export default function CalendarPage() {
 
         {/* Upcoming events */}
         <div className="bg-white border border-sand-200 rounded-2xl p-5">
-          <h2 className="font-semibold text-sand-900 mb-3">Upcoming</h2>
+          <h2 className="font-semibold text-sand-900 mb-3">Quick Add</h2>
           {upcoming.length === 0 ? (
             <p className="text-sm text-sand-400 text-center py-8">No upcoming events</p>
           ) : (
