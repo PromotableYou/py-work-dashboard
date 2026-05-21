@@ -115,14 +115,15 @@ function CoachNotes() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function CoachesCalendarPage() {
-  const [coaches, setCoaches]       = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState(null)
+  const [coaches, setCoaches]           = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState(null)
   const [showAddCoach, setShowAddCoach] = useState(false)
-  const [newName, setNewName]       = useState('')
-  const [newEmbed, setNewEmbed]     = useState('')
-  const [calMode, setCalMode]       = useState('WEEK')
-  const [embedKey, setEmbedKey]     = useState(0)
+  const [newName, setNewName]           = useState('')
+  const [newEmbed, setNewEmbed]         = useState('')
+  const [calMode, setCalMode]           = useState('WEEK')
+  const [embedKey, setEmbedKey]         = useState(0)
+  const [hiddenIds, setHiddenIds]       = useState(new Set()) // coach IDs toggled off
 
   useEffect(() => {
     getCoaches()
@@ -130,6 +131,15 @@ export default function CoachesCalendarPage() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
+
+  function toggleCoach(id) {
+    setHiddenIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+    setEmbedKey(k => k + 1)
+  }
 
   async function handleAddCoach(e) {
     e.preventDefault()
@@ -151,13 +161,15 @@ export default function CoachesCalendarPage() {
     try {
       await deleteCoach(id)
       setCoaches(prev => prev.filter(c => c.id !== id))
+      setHiddenIds(prev => { const n = new Set(prev); n.delete(id); return n })
       setEmbedKey(k => k + 1)
     } catch (e) { setError(e.message) }
   }
 
-  const embedUrl    = buildEmbedUrl(coaches, calMode)
-  const calCoaches  = coaches.filter(c => c.google_calendar_id)
+  const calCoaches   = coaches.filter(c => c.google_calendar_id)
   const noCalCoaches = coaches.filter(c => !c.google_calendar_id)
+  const visibleCoaches = calCoaches.filter(c => !hiddenIds.has(c.id))
+  const embedUrl     = buildEmbedUrl(visibleCoaches, calMode)
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -251,25 +263,34 @@ export default function CoachesCalendarPage() {
       {embedUrl ? (
         <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
           {/* Toolbar */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-sand-100">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-sand-100 flex-wrap gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <Calendar className="w-4 h-4 text-warm-400" />
-              {calCoaches.map(c => (
-                <div key={c.id} className="flex items-center gap-1 group">
-                  <span
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white"
-                    style={{ backgroundColor: c.color || '#e5a0a0' }}
-                  >
-                    {c.name}
-                  </span>
-                  <button
-                    onClick={() => handleDeleteCoach(c.id)}
-                    className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
+              <Calendar className="w-4 h-4 text-warm-400 shrink-0" />
+              {calCoaches.map(c => {
+                const isOn = !hiddenIds.has(c.id)
+                return (
+                  <div key={c.id} className="flex items-center gap-0.5 group">
+                    <button
+                      onClick={() => toggleCoach(c.id)}
+                      title={isOn ? `Hide ${c.name}` : `Show ${c.name}`}
+                      className={`text-[11px] font-semibold px-3 py-1 rounded-full transition-all ${
+                        isOn
+                          ? 'text-white shadow-sm'
+                          : 'text-sand-400 bg-sand-100 line-through'
+                      }`}
+                      style={isOn ? { backgroundColor: c.color || '#e5a0a0' } : {}}
+                    >
+                      {c.name}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCoach(c.id)}
+                      className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {/* Mode switcher */}
@@ -309,8 +330,17 @@ export default function CoachesCalendarPage() {
         coaches.length > 0 && (
           <div className="bg-sand-50 border border-sand-200 rounded-2xl p-8 text-center">
             <Calendar className="w-8 h-8 text-sand-300 mx-auto mb-3" />
-            <p className="text-sand-500 font-medium text-sm">No calendars connected yet</p>
-            <p className="text-sand-400 text-xs mt-1">Add Google Calendar embed codes to see them here</p>
+            {calCoaches.length === 0 ? (
+              <>
+                <p className="text-sand-500 font-medium text-sm">No calendars connected yet</p>
+                <p className="text-sand-400 text-xs mt-1">Add Google Calendar embed codes to see them here</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sand-500 font-medium text-sm">All calendars hidden</p>
+                <p className="text-sand-400 text-xs mt-1">Click a name above to show their calendar</p>
+              </>
+            )}
           </div>
         )
       )}
