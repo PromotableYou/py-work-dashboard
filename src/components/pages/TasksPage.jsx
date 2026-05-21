@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Check, Trash2, FileText, ChevronDown, ChevronUp, AlertCircle, Circle } from 'lucide-react'
+import { Plus, Check, Trash2, FileText, ChevronDown, ChevronUp, AlertCircle, Circle, GripVertical, X } from 'lucide-react'
 import {
   getProjects, addProject, updateProject, deleteProject,
   getSubtasks, addSubtask, updateSubtask, deleteSubtask,
@@ -11,10 +11,29 @@ const PRIORITY_STYLES = {
   low:    { dot: 'bg-sand-300',   badge: 'bg-sand-50 text-sand-500 border-sand-200'  },
 }
 
-// ─── Subtask row inside a project panel ──────────────────────────────────────
-function SubtaskRow({ sub, onToggle, onDelete }) {
+// ─── localStorage helpers for today's focus ───────────────────────────────────
+const FOCUS_KEY = 'wd_today_focus'
+function getFocusIds() {
+  try { return JSON.parse(localStorage.getItem(FOCUS_KEY) || '[]') } catch { return [] }
+}
+function saveFocusIds(ids) {
+  localStorage.setItem(FOCUS_KEY, JSON.stringify(ids))
+}
+
+// ─── Subtask row — draggable ──────────────────────────────────────────────────
+function SubtaskRow({ sub, onToggle, onDelete, inFocus }) {
   return (
-    <div className={`flex items-start gap-3 px-5 py-2.5 group hover:bg-sand-50 transition-colors ${sub.completed ? 'opacity-50' : ''}`}>
+    <div
+      draggable
+      onDragStart={e => {
+        e.dataTransfer.setData('subtask_id', sub.id)
+        e.dataTransfer.effectAllowed = 'copy'
+      }}
+      className={`flex items-start gap-2 px-5 py-2.5 group hover:bg-sand-50 transition-colors cursor-grab active:cursor-grabbing ${sub.completed ? 'opacity-50' : ''}`}
+    >
+      {/* Drag handle */}
+      <GripVertical className="w-3.5 h-3.5 text-sand-200 group-hover:text-sand-400 mt-0.5 shrink-0 transition-colors" />
+
       <button
         onClick={() => onToggle(sub)}
         className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
@@ -23,9 +42,16 @@ function SubtaskRow({ sub, onToggle, onDelete }) {
       >
         {sub.completed && <Check className="w-2.5 h-2.5 text-white" />}
       </button>
+
       <span className={`flex-1 text-sm leading-relaxed ${sub.completed ? 'line-through text-sand-400' : 'text-sand-700'}`}>
         {sub.text}
       </span>
+
+      {/* Already-in-focus indicator */}
+      {inFocus && (
+        <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-blush-400" title="In today's focus" />
+      )}
+
       <button
         onClick={() => onDelete(sub.id)}
         className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5"
@@ -37,7 +63,7 @@ function SubtaskRow({ sub, onToggle, onDelete }) {
 }
 
 // ─── Project panel ────────────────────────────────────────────────────────────
-function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSub, onToggleSub, onDeleteSub }) {
+function ProjectPanel({ project, subtasks, focusIds, onToggle, onDelete, onUpdate, onAddSub, onToggleSub, onDeleteSub }) {
   const [expanded, setExpanded] = useState(true)
   const [newSub, setNewSub] = useState('')
   const [showNotes, setShowNotes] = useState(!!project.notes)
@@ -68,7 +94,6 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
       {/* Project header */}
       <div className="px-5 py-4">
         <div className="flex items-start gap-3">
-          {/* Complete button */}
           <button
             onClick={() => onToggle(project)}
             className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
@@ -89,7 +114,6 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
               </span>
             </div>
 
-            {/* Progress bar */}
             {total > 0 && (
               <div className="flex items-center gap-2 mt-2">
                 <div className="flex-1 h-1.5 bg-sand-100 rounded-full overflow-hidden">
@@ -101,19 +125,15 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
                 <span className="text-xs text-sand-400 shrink-0">{done}/{total} · {pct}%</span>
               </div>
             )}
-            {total === 0 && (
-              <p className="text-xs text-sand-300 mt-1">No tasks yet</p>
-            )}
+            {total === 0 && <p className="text-xs text-sand-300 mt-1">No tasks yet</p>}
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setShowNotes(!showNotes)}
               className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                 notes ? 'text-blush-400 bg-blush-50' : 'text-sand-300 hover:text-sand-500 hover:bg-sand-50'
               }`}
-              title="Project notes"
             >
               <FileText className="w-3.5 h-3.5" />
             </button>
@@ -132,7 +152,6 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
           </div>
         </div>
 
-        {/* Notes area */}
         {showNotes && (
           <div className="mt-3 ml-8">
             <textarea
@@ -152,15 +171,17 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
           {subtasks.length === 0 && (
             <p className="text-sm text-sand-300 text-center py-5">No tasks yet — add one below</p>
           )}
+          {subtasks.length > 0 && (
+            <p className="text-[10px] text-sand-300 text-center pt-3 pb-1">Drag tasks → Today's Focus</p>
+          )}
 
           {subtasks.filter(s => !s.completed).map(s => (
-            <SubtaskRow key={s.id} sub={s} onToggle={onToggleSub} onDelete={onDeleteSub} />
+            <SubtaskRow key={s.id} sub={s} onToggle={onToggleSub} onDelete={onDeleteSub} inFocus={focusIds.includes(s.id)} />
           ))}
           {subtasks.filter(s => s.completed).map(s => (
-            <SubtaskRow key={s.id} sub={s} onToggle={onToggleSub} onDelete={onDeleteSub} />
+            <SubtaskRow key={s.id} sub={s} onToggle={onToggleSub} onDelete={onDeleteSub} inFocus={focusIds.includes(s.id)} />
           ))}
 
-          {/* Add task input */}
           <form onSubmit={submitSub} className="flex items-center gap-2 px-5 py-3 border-t border-sand-50">
             <Circle className="w-4 h-4 text-sand-200 shrink-0" />
             <input
@@ -181,135 +202,145 @@ function ProjectPanel({ project, subtasks, onToggle, onDelete, onUpdate, onAddSu
   )
 }
 
-// ─── Today's Focus notepad (project-linked) ───────────────────────────────────
-function Notepad({ projects, subtasks, onAddSub, onToggleSub, onDeleteSub }) {
-  const [selectedId, setSelectedId] = useState(null)
-  const [newText, setNewText] = useState('')
+// ─── Today's Focus notepad — drop zone ───────────────────────────────────────
+function Notepad({ subtasks, onToggleSub }) {
+  const [focusIds, setFocusIds] = useState(getFocusIds)
+  const [isDragOver, setIsDragOver] = useState(false)
 
-  // Auto-select first project on load / if selected project disappears
-  useEffect(() => {
-    if (projects.length > 0 && (!selectedId || !projects.find(p => p.id === selectedId))) {
-      setSelectedId(projects[0].id)
-    }
-  }, [projects, selectedId])
+  // Resolve IDs to actual subtask objects (skip deleted ones)
+  const focusSubs = focusIds.map(id => subtasks.find(s => s.id === id)).filter(Boolean)
 
-  const selectedProject = projects.find(p => p.id === selectedId) || null
-  const projectSubs = subtasks.filter(s => s.project_id === selectedId)
-  const done = projectSubs.filter(s => s.completed).length
-  const total = projectSubs.length
-  const pct = total ? Math.round((done / total) * 100) : 0
-
-  const incomplete = projectSubs.filter(s => !s.completed)
-  const complete = projectSubs.filter(s => s.completed)
-
-  function submitTask(e) {
+  function handleDragOver(e) {
     e.preventDefault()
-    if (!newText.trim() || !selectedId) return
-    onAddSub(selectedId, newText.trim())
-    setNewText('')
+    e.dataTransfer.dropEffect = 'copy'
+    setIsDragOver(true)
   }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setIsDragOver(false)
+    const id = e.dataTransfer.getData('subtask_id')
+    if (!id || focusIds.includes(id)) return
+    const newIds = [...focusIds, id]
+    setFocusIds(newIds)
+    saveFocusIds(newIds)
+  }
+
+  function removeFromFocus(id) {
+    const newIds = focusIds.filter(i => i !== id)
+    setFocusIds(newIds)
+    saveFocusIds(newIds)
+  }
+
+  const incomplete = focusSubs.filter(s => !s.completed)
+  const complete = focusSubs.filter(s => s.completed)
 
   return (
     <div className="bg-[#FFFDF7] border border-amber-200 rounded-2xl overflow-hidden shadow-sm sticky top-6">
 
       {/* Header */}
       <div className="px-5 py-4 border-b border-amber-100">
-        <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest mb-2">Today's Focus</p>
+        <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest">Today's Focus</p>
+        <p className="text-sm text-sand-500 mt-0.5">
+          {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' })}
+        </p>
+        {focusSubs.length > 0 && (
+          <div className="flex items-center gap-2 mt-2.5">
+            <div className="flex-1 h-1.5 bg-amber-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blush-400 to-blush-500 rounded-full transition-all duration-500"
+                style={{ width: `${complete.length / focusSubs.length * 100}%` }}
+              />
+            </div>
+            <span className="text-xs text-amber-600 font-semibold shrink-0">{complete.length}/{focusSubs.length}</span>
+          </div>
+        )}
+      </div>
 
-        {projects.length === 0 ? (
-          <p className="text-sm text-sand-400">No projects yet</p>
-        ) : (
-          <select
-            value={selectedId || ''}
-            onChange={e => setSelectedId(e.target.value)}
-            className="w-full text-sm font-bold text-sand-900 bg-transparent border-0 focus:outline-none cursor-pointer pr-1 -ml-0.5"
+      {/* Drop zone + task list */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={handleDrop}
+        className={`min-h-[200px] transition-colors ${isDragOver ? 'bg-blush-50' : ''}`}
+      >
+        {focusSubs.length === 0 && (
+          <div className={`flex flex-col items-center justify-center py-10 px-5 text-center transition-colors ${isDragOver ? 'opacity-100' : 'opacity-60'}`}>
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-3 transition-colors ${isDragOver ? 'bg-blush-100' : 'bg-amber-100'}`}>
+              <GripVertical className={`w-5 h-5 ${isDragOver ? 'text-blush-400' : 'text-amber-400'}`} />
+            </div>
+            <p className={`text-sm font-medium ${isDragOver ? 'text-blush-500' : 'text-sand-400'}`}>
+              {isDragOver ? 'Drop to add to focus' : 'Drag tasks here'}
+            </p>
+            <p className="text-xs text-sand-300 mt-1">Pick specific tasks from your projects</p>
+          </div>
+        )}
+
+        {/* Drop-here hint when has items and dragging over */}
+        {isDragOver && focusSubs.length > 0 && (
+          <div className="mx-4 mt-3 py-2 border-2 border-dashed border-blush-300 rounded-xl text-center">
+            <p className="text-xs text-blush-400 font-medium">Drop to add</p>
+          </div>
+        )}
+
+        <div className="divide-y divide-amber-100/60">
+          {incomplete.map(s => (
+            <div key={s.id} className="flex items-start gap-3 px-5 py-3 group hover:bg-amber-50/50 transition-colors">
+              <button
+                onClick={() => onToggleSub(s)}
+                className="mt-0.5 w-4 h-4 rounded border-2 border-amber-300 hover:border-blush-400 flex items-center justify-center shrink-0 transition-colors"
+              />
+              <span className="flex-1 text-sm text-sand-800 leading-relaxed">{s.text}</span>
+              <button
+                onClick={() => removeFromFocus(s.id)}
+                className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-sand-500 transition-all shrink-0 mt-0.5"
+                title="Remove from today's focus"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+
+          {complete.map(s => (
+            <div key={s.id} className="flex items-start gap-3 px-5 py-3 group opacity-40 hover:bg-amber-50/30 transition-colors">
+              <button
+                onClick={() => onToggleSub(s)}
+                className="mt-0.5 w-4 h-4 rounded border-2 bg-blush-400 border-blush-400 flex items-center justify-center shrink-0"
+              >
+                <Check className="w-2.5 h-2.5 text-white" />
+              </button>
+              <span className="flex-1 text-sm text-sand-600 line-through leading-relaxed">{s.text}</span>
+              <button
+                onClick={() => removeFromFocus(s.id)}
+                className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-sand-500 transition-all shrink-0 mt-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Clear all */}
+      {focusSubs.length > 0 && (
+        <div className="border-t border-amber-100 px-5 py-3">
+          <button
+            onClick={() => { setFocusIds([]); saveFocusIds([]) }}
+            className="text-xs text-sand-300 hover:text-sand-500 transition-colors"
           >
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Progress */}
-        {selectedProject && (
-          <div className="mt-2.5">
-            {total > 0 ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-amber-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blush-400 to-blush-500 rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-amber-600 font-semibold shrink-0">{done}/{total}</span>
-                </div>
-                <p className="text-[10px] text-amber-400 mt-1">{pct}% complete</p>
-              </>
-            ) : (
-              <p className="text-xs text-sand-300">No tasks yet — add one below</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Task list */}
-      <div className="divide-y divide-amber-100/60 min-h-[160px]">
-        {selectedProject && incomplete.length === 0 && complete.length === 0 && (
-          <p className="text-sm text-sand-300 text-center py-8">Nothing yet — add a task below</p>
-        )}
-
-        {incomplete.map(s => (
-          <div key={s.id} className="flex items-start gap-3 px-5 py-3 group hover:bg-amber-50/50 transition-colors">
-            <button
-              onClick={() => onToggleSub(s)}
-              className="mt-0.5 w-4 h-4 rounded border-2 border-amber-300 hover:border-blush-400 flex items-center justify-center shrink-0 transition-colors"
-            />
-            <span className="flex-1 text-sm text-sand-800 leading-relaxed">{s.text}</span>
-            <button onClick={() => onDeleteSub(s.id)} className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5">
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
-
-        {complete.map(s => (
-          <div key={s.id} className="flex items-start gap-3 px-5 py-3 group opacity-40 hover:bg-amber-50/30 transition-colors">
-            <button
-              onClick={() => onToggleSub(s)}
-              className="mt-0.5 w-4 h-4 rounded border-2 bg-blush-400 border-blush-400 flex items-center justify-center shrink-0"
-            >
-              <Check className="w-2.5 h-2.5 text-white" />
-            </button>
-            <span className="flex-1 text-sm text-sand-600 line-through leading-relaxed">{s.text}</span>
-            <button onClick={() => onDeleteSub(s.id)} className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5">
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Add input */}
-      {selectedProject && (
-        <form onSubmit={submitTask} className="border-t border-amber-100 px-5 py-3 flex items-center gap-2">
-          <input
-            value={newText}
-            onChange={e => setNewText(e.target.value)}
-            placeholder="Add task to this project…"
-            className="flex-1 text-sm bg-transparent text-sand-800 placeholder-sand-400 focus:outline-none"
-          />
-          <button type="submit" className="w-7 h-7 bg-blush-500 hover:bg-blush-600 text-white rounded-lg flex items-center justify-center transition-colors shrink-0">
-            <Plus className="w-3.5 h-3.5" />
+            Clear today's focus
           </button>
-        </form>
+        </div>
       )}
     </div>
   )
 }
 
-// ─── Main page ─────────────────────────────────────────────────────────────────
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function TasksPage() {
   const [projects, setProjects] = useState([])
   const [subtasks, setSubtasks] = useState([])
+  const [focusIds, setFocusIds] = useState(getFocusIds)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showAddProject, setShowAddProject] = useState(false)
@@ -326,7 +357,6 @@ export default function TasksPage() {
     .filter(p => !p.done)
     .sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.priority] - ({ high: 0, medium: 1, low: 2 }[b.priority])))
 
-  // ── Projects ──
   async function handleAddProject(e) {
     e.preventDefault()
     if (!newProject.name.trim()) return
@@ -357,7 +387,6 @@ export default function TasksPage() {
     } catch (e) { setError(e.message) }
   }
 
-  // ── Subtasks ──
   async function handleAddSub(projectId, text) {
     try {
       const s = await addSubtask({ project_id: projectId, text, completed: false })
@@ -374,6 +403,10 @@ export default function TasksPage() {
     try {
       await deleteSubtask(id)
       setSubtasks(p => p.filter(s => s.id !== id))
+      // Also remove from focus if it was there
+      const newIds = getFocusIds().filter(i => i !== id)
+      saveFocusIds(newIds)
+      setFocusIds(newIds)
     } catch (e) { setError(e.message) }
   }
 
@@ -385,7 +418,6 @@ export default function TasksPage() {
 
   return (
     <div className="pb-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-sand-900">Tasks</h1>
@@ -407,10 +439,8 @@ export default function TasksPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-        {/* Projects — left 2/3 */}
         <div className="lg:col-span-2 space-y-4">
 
-          {/* Add project form */}
           {showAddProject && (
             <div className="bg-white border-2 border-blush-200 rounded-2xl p-5 space-y-3">
               <h3 className="font-semibold text-sand-900 text-sm">New Project</h3>
@@ -444,7 +474,6 @@ export default function TasksPage() {
             </div>
           )}
 
-          {/* Project panels */}
           {activeProjects.length === 0 && !showAddProject && (
             <div className="bg-white border border-sand-200 rounded-2xl px-5 py-16 text-center">
               <p className="text-sand-400 text-sm">No projects yet</p>
@@ -459,6 +488,7 @@ export default function TasksPage() {
               key={p.id}
               project={p}
               subtasks={subtasks.filter(s => s.project_id === p.id)}
+              focusIds={focusIds}
               onToggle={handleToggleProject}
               onDelete={handleDeleteProject}
               onUpdate={handleUpdateProject}
@@ -475,14 +505,11 @@ export default function TasksPage() {
           )}
         </div>
 
-        {/* Focus notepad — right 1/3 */}
+        {/* Today's Focus — right 1/3 */}
         <div>
           <Notepad
-            projects={activeProjects}
             subtasks={subtasks}
-            onAddSub={handleAddSub}
             onToggleSub={handleToggleSub}
-            onDeleteSub={handleDeleteSub}
           />
         </div>
       </div>
