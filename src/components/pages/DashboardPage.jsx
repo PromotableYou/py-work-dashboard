@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { CheckSquare, Calendar, Lightbulb, Brain, Clock, ArrowRight, TrendingUp, Zap, Star, AlertCircle, Flame } from 'lucide-react'
 import { getTasks, getProjects, getSubtasks, getDumps, getIdeas, getTimelog } from '../../lib/supabase'
 import { getStreak } from './TasksPage'
+import QuickLinks from '../QuickLinks'
 
 const GCAL_AGENDA = 'https://calendar.google.com/calendar/embed?src=shaniah%40promotableyou.com.au&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA'
 
@@ -138,6 +139,9 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ── Quick Links ── */}
+      <QuickLinks workspace="shaniah" />
 
       {/* ── Stats row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

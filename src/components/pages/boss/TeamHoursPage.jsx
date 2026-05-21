@@ -345,98 +345,110 @@ export default function TeamHoursPage() {
         </div>
       ) : (
         <>
-          {[{ label: 'Week 1', weekDays: week1 }, { label: 'Week 2', weekDays: week2 }].map(({ label, weekDays }) => (
-            <div key={label} className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-sand-100 flex items-center justify-between">
-                <p className="text-xs font-bold text-blush-500 uppercase tracking-widest">{label}</p>
-                <p className="text-xs text-sand-400">
-                  {weekDays[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {weekDays[4].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                </p>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-sand-100">
-                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-sand-500 w-36">Member</th>
-                      {weekDays.map(d => {
-                        const iso = localISO(d)
-                        const isToday = iso === TODAY
-                        return (
-                          <th key={iso} className={`px-1 py-2.5 text-center text-xs font-semibold w-16 ${isToday ? 'text-blush-500' : 'text-sand-500'}`}>
-                            <div>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</div>
-                            <div className={`text-[10px] font-normal ${isToday ? 'text-blush-400' : 'text-sand-400'}`}>
-                              {d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                            </div>
-                          </th>
-                        )
-                      })}
-                      <th className="px-3 py-2.5 text-center text-xs font-semibold text-sand-500 w-16">Week</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {members.map((member, i) => {
-                      const weekTotal = memberWeekTotal(member.name, weekDays)
+          {/* Single unified grid — all 10 days in one table */}
+          <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  {/* Week label row */}
+                  <tr className="border-b border-sand-100 bg-sand-50/60">
+                    <th className="px-4 py-2 w-36" />
+                    <th colSpan={5} className="px-1 py-2 text-center border-r-2 border-sand-200">
+                      <span className="text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 1</span>
+                      <span className="text-[10px] text-sand-400 font-normal ml-1.5">
+                        {week1[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {week1[4].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                      </span>
+                    </th>
+                    <th colSpan={5} className="px-1 py-2 text-center border-r-2 border-sand-200">
+                      <span className="text-[10px] font-bold text-warm-500 uppercase tracking-widest">Week 2</span>
+                      <span className="text-[10px] text-sand-400 font-normal ml-1.5">
+                        {week2[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {week2[4].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                      </span>
+                    </th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                  {/* Day name row */}
+                  <tr className="border-b border-sand-100">
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-sand-500 w-36">Member</th>
+                    {days.map((d, i) => {
+                      const iso = localISO(d)
+                      const isToday = iso === TODAY
+                      const isWeekBoundary = i === 4
                       return (
-                        <tr key={member.id} className={`border-b border-sand-50 last:border-0 ${i % 2 === 0 ? '' : 'bg-sand-50/40'}`}>
-                          <td className="px-4 py-2">
-                            <div className="flex items-center gap-2 group">
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                                style={{ backgroundColor: member.color || '#e5a0a0' }}>
-                                {member.name.charAt(0).toUpperCase()}
-                              </div>
-                              <span className="text-sm font-medium text-sand-800 truncate max-w-[80px]">{member.name}</span>
-                              <button onClick={() => handleDeleteMember(member.id)}
-                                className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all ml-auto">
-                                <Trash2 className="w-3 h-3" />
-                              </button>
+                        <th key={iso} className={`px-1 py-2 text-center text-xs font-semibold w-14 ${isToday ? 'text-blush-500' : 'text-sand-500'} ${isWeekBoundary ? 'border-r-2 border-sand-200' : ''}`}>
+                          <div>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</div>
+                          <div className={`text-[9px] font-normal ${isToday ? 'text-blush-400' : 'text-sand-400'}`}>
+                            {d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                          </div>
+                        </th>
+                      )
+                    })}
+                    <th className="px-3 py-2 text-center text-xs font-semibold text-sand-500 w-16">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map((member, i) => {
+                    const total = memberTotal(member.name)
+                    return (
+                      <tr key={member.id} className={`border-b border-sand-50 last:border-0 ${i % 2 === 0 ? '' : 'bg-sand-50/40'}`}>
+                        <td className="px-4 py-1.5">
+                          <div className="flex items-center gap-2 group">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                              style={{ backgroundColor: member.color || '#e5a0a0' }}>
+                              {member.name.charAt(0).toUpperCase()}
                             </div>
-                          </td>
-                          {weekDays.map(d => {
-                            const iso = localISO(d)
-                            return (
+                            <span className="text-sm font-medium text-sand-800 truncate max-w-[80px]">{member.name}</span>
+                            <button onClick={() => handleDeleteMember(member.id)}
+                              className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all ml-auto">
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+                        {days.map((d, idx) => {
+                          const iso = localISO(d)
+                          const isWeekBoundary = idx === 4
+                          return (
+                            <td key={iso} className={isWeekBoundary ? 'border-r-2 border-sand-200' : ''}>
                               <HourCell
-                                key={iso}
                                 memberName={member.name}
                                 dateISO={iso}
                                 value={getHours(member.name, iso)}
                                 leaveType={getType(member.name, iso)}
                                 onChange={handleCellChange}
                               />
-                            )
-                          })}
-                          <td className="px-3 py-2 text-center">
-                            <span className={`text-sm font-bold ${weekTotal > 0 ? 'text-blush-600' : 'text-sand-300'}`}>
-                              {fmt(weekTotal)}
-                            </span>
-                          </td>
-                        </tr>
+                            </td>
+                          )
+                        })}
+                        <td className="px-3 py-1.5 text-center">
+                          <span className={`text-sm font-bold ${total > 0 ? 'text-blush-600' : 'text-sand-300'}`}>
+                            {fmt(total)}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+
+                  {/* Day totals row */}
+                  <tr className="bg-sand-50 border-t-2 border-sand-200">
+                    <td className="px-4 py-2 text-xs font-bold text-sand-500 uppercase tracking-wide">Total</td>
+                    {days.map((d, idx) => {
+                      const iso = localISO(d)
+                      const total = dayTotal(iso)
+                      const isWeekBoundary = idx === 4
+                      return (
+                        <td key={iso} className={`px-1 py-2 text-center ${isWeekBoundary ? 'border-r-2 border-sand-200' : ''}`}>
+                          <span className={`text-xs font-bold ${total > 0 ? 'text-sand-700' : 'text-sand-200'}`}>{fmt(total)}</span>
+                        </td>
                       )
                     })}
-
-                    {/* Day totals */}
-                    <tr className="bg-sand-50 border-t-2 border-sand-200">
-                      <td className="px-4 py-2 text-xs font-bold text-sand-500 uppercase tracking-wide">Total</td>
-                      {weekDays.map(d => {
-                        const iso = localISO(d)
-                        const total = dayTotal(iso)
-                        return (
-                          <td key={iso} className="px-1 py-2 text-center">
-                            <span className={`text-xs font-bold ${total > 0 ? 'text-sand-700' : 'text-sand-300'}`}>{fmt(total)}</span>
-                          </td>
-                        )
-                      })}
-                      <td className="px-3 py-2 text-center">
-                        <span className="text-xs font-bold text-sand-700">
-                          {fmt(weekDays.reduce((s, d) => s + dayTotal(localISO(d)), 0))}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                    <td className="px-3 py-2 text-center">
+                      <span className="text-xs font-bold text-blush-600">{fmt(grandTotal())}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          ))}
+          </div>
 
           {/* Payroll summary table */}
           <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">

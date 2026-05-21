@@ -263,6 +263,26 @@ export async function upsertTeamHourRow(row) {
   return data
 }
 
+// ─── QUICK LINKS ─────────────────────────────────────────────────────────────
+export async function getQuickLinks(workspace = 'shaniah') {
+  const { data, error } = await supabase
+    .from('wd_quick_links').select('*')
+    .eq('workspace', workspace)
+    .order('position', { ascending: true })
+  if (error) throw error
+  return data
+}
+export async function addQuickLink(link) {
+  const { data, error } = await supabase
+    .from('wd_quick_links').insert([link]).select().single()
+  if (error) throw error
+  return data
+}
+export async function deleteQuickLink(id) {
+  const { error } = await supabase.from('wd_quick_links').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ─── COACHES ─────────────────────────────────────────────────────────────────
 export async function getCoaches() {
   const { data, error } = await supabase

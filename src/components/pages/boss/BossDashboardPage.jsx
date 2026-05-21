@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { CheckSquare, FolderOpen, CalendarDays, Users, TrendingUp, Clock } from 'lucide-react'
 import { getProjects, getMeetings, getTeamMembers, getTeamHours } from '../../../lib/supabase'
+import QuickLinks from '../../QuickLinks'
 
 function localISO(date = new Date()) {
   const y = date.getFullYear()
@@ -102,6 +103,9 @@ export default function BossDashboardPage() {
           {NOW.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
+
+      {/* Quick Links */}
+      <QuickLinks workspace="stacey" />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
