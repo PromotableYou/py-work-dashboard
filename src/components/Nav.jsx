@@ -1,11 +1,12 @@
 import { NavLink, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList } from 'lucide-react'
 
 const SHANIAH_LINKS = [
   { to: '/',          icon: LayoutDashboard, label: 'Dashboard'  },
   { to: '/tasks',     icon: CheckSquare,     label: 'Tasks'      },
   { to: '/calendar',  icon: Calendar,        label: 'Calendar'   },
   { to: '/meetings',  icon: CalendarDays,    label: 'Meetings'   },
+  { to: '/notes',     icon: StickyNote,      label: 'Notes'      },
   { to: '/ideas',     icon: Lightbulb,       label: 'Ideas'      },
   { to: '/dump',      icon: Brain,           label: 'Brain Dump' },
   { to: '/timesheet', icon: Clock,           label: 'Timesheet'  },
@@ -17,6 +18,8 @@ const BOSS_LINKS = [
   { to: '/stacey/calendar',          icon: Calendar,        label: 'Calendar'         },
   { to: '/stacey/meetings',          icon: CalendarDays,    label: 'Meetings'         },
   { to: '/stacey/coaches-calendar',  icon: CalendarRange,   label: 'Coaches Cal'      },
+  { to: '/stacey/roster',            icon: ClipboardList,   label: 'Roster'           },
+  { to: '/stacey/notes',             icon: StickyNote,      label: 'Notes'            },
   { to: '/stacey/ideas',             icon: Lightbulb,       label: 'Ideas'            },
   { to: '/stacey/dump',              icon: Brain,           label: 'Brain Dump'       },
   { to: '/stacey/team-hours',        icon: Users,           label: 'Team Hours'       },
@@ -30,7 +33,7 @@ export default function Nav() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 h-full w-56 bg-white border-r border-sand-200 flex-col py-6 px-4 z-40">
+      <aside className="hidden lg:flex print:hidden fixed left-0 top-0 h-full w-56 bg-white border-r border-sand-200 flex-col py-6 px-4 z-40">
         <div className="mb-4 px-2">
           <p className="text-xs font-semibold text-sand-400 uppercase tracking-widest">Promotable You</p>
           <h1 className="text-lg font-bold text-sand-900 mt-0.5">Work Dashboard</h1>
@@ -84,7 +87,7 @@ export default function Nav() {
       </aside>
 
       {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-sand-200 z-40 flex overflow-x-auto">
+      <nav className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-sand-200 z-40 flex overflow-x-auto">
         {links.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

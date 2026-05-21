@@ -321,3 +321,52 @@ export async function upsertCoachHourRow(row) {
   if (error) throw error
   return data
 }
+
+// ─── NOTES ────────────────────────────────────────────────────────────────────
+export async function getNotes(workspace = 'shaniah') {
+  const { data, error } = await supabase
+    .from('wd_notes').select('*')
+    .eq('workspace', workspace)
+    .order('pinned', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+export async function addNote(note) {
+  const { data, error } = await supabase
+    .from('wd_notes').insert([note]).select().single()
+  if (error) throw error
+  return data
+}
+export async function updateNote(id, updates) {
+  const { data, error } = await supabase
+    .from('wd_notes').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+export async function deleteNote(id) {
+  const { error } = await supabase.from('wd_notes').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ─── ROSTER ───────────────────────────────────────────────────────────────────
+export async function getRoster(weekStart) {
+  const { data, error } = await supabase
+    .from('wd_roster').select('*')
+    .eq('week_start', weekStart)
+    .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+export async function upsertRosterRow(row) {
+  const { data, error } = await supabase
+    .from('wd_roster')
+    .upsert([row], { onConflict: 'week_start,slot_label' })
+    .select().single()
+  if (error) throw error
+  return data
+}
+export async function deleteRosterRow(id) {
+  const { error } = await supabase.from('wd_roster').delete().eq('id', id)
+  if (error) throw error
+}

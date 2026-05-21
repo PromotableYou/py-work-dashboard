@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle, Calendar, ExternalLink, RefreshCw } from 'lucide-react'
-import { getCoaches, addCoach, deleteCoach, updateCoach, getCoachHours, upsertCoachHourRow } from '../../../lib/supabase'
+import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle, Calendar, ExternalLink, RefreshCw, FileText } from 'lucide-react'
+import { getCoaches, addCoach, deleteCoach, updateCoach, getCoachHours, upsertCoachHourRow, getNotes, addNote, updateNote, deleteNote } from '../../../lib/supabase'
 
 const CAL_MODES = [
   { label: 'Day',    value: 'DAY'    },
@@ -111,6 +111,99 @@ function HourCell({ coachName, dateISO, value, onChange }) {
         } ${isToday ? 'ring-1 ring-warm-300' : ''}`}
       />
     </td>
+  )
+}
+
+// ─── Coach Notes panel ────────────────────────────────────────────────────────
+function CoachNotes() {
+  const [notes, setNotes]       = useState([])
+  const [expanded, setExpanded] = useState(true)
+  const [newText, setNewText]   = useState('')
+  const saveTimers              = useRef({})
+
+  useEffect(() => {
+    getNotes('coaches').then(setNotes).catch(() => {})
+  }, [])
+
+  async function handleAdd(e) {
+    e.preventDefault()
+    if (!newText.trim()) return
+    const saved = await addNote({ title: '', content: newText.trim(), workspace: 'coaches', color: 'yellow', pinned: false })
+    setNotes(prev => [saved, ...prev])
+    setNewText('')
+  }
+
+  function handleEdit(id, content) {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, content } : n))
+    clearTimeout(saveTimers.current[id])
+    saveTimers.current[id] = setTimeout(() => updateNote(id, { content }), 700)
+  }
+
+  async function handleDelete(id) {
+    await deleteNote(id)
+    setNotes(prev => prev.filter(n => n.id !== id))
+  }
+
+  return (
+    <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-5 py-3 border-b border-sand-100 hover:bg-sand-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-amber-400" />
+          <span className="font-semibold text-sand-900 text-sm">Coach Notes</span>
+          {notes.length > 0 && (
+            <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">{notes.length}</span>
+          )}
+        </div>
+        <span className="text-sand-400 text-xs">{expanded ? '▲' : '▼'}</span>
+      </button>
+
+      {expanded && (
+        <div className="p-5 space-y-3">
+          {/* Add note form */}
+          <form onSubmit={handleAdd} className="flex gap-2">
+            <input
+              value={newText}
+              onChange={e => setNewText(e.target.value)}
+              placeholder="Add a note about coaches, schedules, reminders…"
+              className="flex-1 text-sm bg-sand-50 border border-sand-200 rounded-xl px-3 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-amber-200 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="bg-amber-400 hover:bg-amber-500 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors whitespace-nowrap"
+            >
+              Add
+            </button>
+          </form>
+
+          {/* Notes list */}
+          {notes.length === 0 ? (
+            <p className="text-xs text-sand-300 text-center py-3">No notes yet</p>
+          ) : (
+            <div className="space-y-2">
+              {notes.map(note => (
+                <div key={note.id} className="group flex gap-2 items-start bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                  <textarea
+                    value={note.content}
+                    onChange={e => handleEdit(note.id, e.target.value)}
+                    rows={2}
+                    className="flex-1 text-sm text-sand-800 bg-transparent border-0 outline-none resize-none leading-relaxed"
+                  />
+                  <button
+                    onClick={() => handleDelete(note.id)}
+                    className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all mt-0.5 shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -446,6 +539,9 @@ export default function CoachesCalendarPage() {
               </div>
             </div>
           ))}
+
+          {/* Coach notes */}
+          <CoachNotes />
 
           {/* Pay period summary */}
           <div className="bg-gradient-to-br from-blush-500 to-warm-500 rounded-2xl p-5 text-white">
