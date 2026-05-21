@@ -181,9 +181,11 @@ export async function deleteTimelogRow(id) {
 }
 
 // ─── MEETINGS ────────────────────────────────────────────────────────────────
-export async function getMeetings() {
+export async function getMeetings(workspace = 'stacey') {
   const { data, error } = await supabase
-    .from('wd_meetings').select('*').order('date', { ascending: false })
+    .from('wd_meetings').select('*')
+    .eq('workspace', workspace)
+    .order('date', { ascending: false })
   if (error) throw error
   return data
 }
@@ -259,4 +261,22 @@ export async function upsertTeamHourRow(row) {
     .select().single()
   if (error) throw error
   return data
+}
+
+// ─── CALENDARS (coaches) ──────────────────────────────────────────────────────
+export async function getCalendars() {
+  const { data, error } = await supabase
+    .from('wd_calendars').select('*').order('created_at', { ascending: true })
+  if (error) throw error
+  return data
+}
+export async function addCalendar(cal) {
+  const { data, error } = await supabase
+    .from('wd_calendars').insert([cal]).select().single()
+  if (error) throw error
+  return data
+}
+export async function deleteCalendar(id) {
+  const { error } = await supabase.from('wd_calendars').delete().eq('id', id)
+  if (error) throw error
 }

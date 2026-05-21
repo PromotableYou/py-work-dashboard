@@ -8,10 +8,14 @@ const MODES = [
   { label: 'Agenda', value: 'AGENDA' },
 ]
 
-const BASE_SRC = 'https://calendar.google.com/calendar/embed?src=shaniah%40promotableyou.com.au&ctz=Australia%2FBrisbane&showTitle=0&showNav=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0'
+function buildSrc(calendarEmail) {
+  const encoded = encodeURIComponent(calendarEmail)
+  return `https://calendar.google.com/calendar/embed?src=${encoded}&ctz=Australia%2FBrisbane&showTitle=0&showNav=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0`
+}
 
-export default function CalendarPage() {
+export default function CalendarPage({ calendarEmail = 'shaniah@promotableyou.com.au' }) {
   const [mode, setMode] = useState('WEEK')
+  const BASE_SRC = buildSrc(calendarEmail)
 
   return (
     <div className="space-y-4 pb-6">

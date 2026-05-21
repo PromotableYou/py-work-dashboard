@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, AlertCircle, Check } from 'lucide-react'
-import { getTimelog, upsertTimelogRow } from '../../lib/supabase'
+import { getTimelog, upsertTimelogRow, upsertTeamHourRow } from '../../lib/supabase'
 
 const STD_HOURS = 7.6
 
@@ -244,6 +244,14 @@ export default function TimesheetPage() {
     try {
       const saved = await upsertTimelogRow(updated)
       setRows(prev => ({ ...prev, [date]: saved }))
+      // Mirror to Stacey's team hours so her tracker stays in sync
+      await upsertTeamHourRow({
+        person_name: 'Shaniah',
+        date,
+        worked: !!(saved.clock_in),
+        type: saved.type || 'Normal',
+        notes: saved.notes || '',
+      })
     } catch (e) { setError(e.message) }
   }, [rows])
 

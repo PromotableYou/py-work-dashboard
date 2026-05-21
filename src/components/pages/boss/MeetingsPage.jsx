@@ -230,7 +230,7 @@ function MeetingCard({ meeting, onDelete }) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function MeetingsPage() {
+export default function MeetingsPage({ workspace = 'stacey' }) {
   const [meetings, setMeetings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -239,11 +239,11 @@ export default function MeetingsPage() {
   const [form, setForm] = useState({ title: '', date: TODAY, time: '', attendees: '' })
 
   useEffect(() => {
-    getMeetings()
+    getMeetings(workspace)
       .then(setMeetings)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [workspace])
 
   async function handleAdd(e) {
     e.preventDefault()
@@ -256,6 +256,7 @@ export default function MeetingsPage() {
         attendees: form.attendees || null,
         agenda: '',
         notes: '',
+        workspace,
       })
       setMeetings(prev => [saved, ...prev].sort((a, b) => (a.date || '').localeCompare(b.date || '')))
       setForm({ title: '', date: TODAY, time: '', attendees: '' })

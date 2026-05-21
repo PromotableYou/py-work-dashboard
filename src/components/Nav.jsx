@@ -1,23 +1,25 @@
 import { NavLink, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange } from 'lucide-react'
 
 const SHANIAH_LINKS = [
   { to: '/',          icon: LayoutDashboard, label: 'Dashboard'  },
   { to: '/tasks',     icon: CheckSquare,     label: 'Tasks'      },
   { to: '/calendar',  icon: Calendar,        label: 'Calendar'   },
+  { to: '/meetings',  icon: CalendarDays,    label: 'Meetings'   },
   { to: '/ideas',     icon: Lightbulb,       label: 'Ideas'      },
   { to: '/dump',      icon: Brain,           label: 'Brain Dump' },
   { to: '/timesheet', icon: Clock,           label: 'Timesheet'  },
 ]
 
 const BOSS_LINKS = [
-  { to: '/boss',            icon: LayoutDashboard, label: 'Dashboard'   },
-  { to: '/boss/tasks',      icon: CheckSquare,     label: 'Tasks'       },
-  { to: '/boss/calendar',   icon: Calendar,        label: 'Calendar'    },
-  { to: '/boss/ideas',      icon: Lightbulb,       label: 'Ideas'       },
-  { to: '/boss/dump',       icon: Brain,           label: 'Brain Dump'  },
-  { to: '/boss/meetings',   icon: CalendarDays,    label: 'Meetings'    },
-  { to: '/boss/team-hours', icon: Users,           label: 'Team Hours'  },
+  { to: '/boss',                   icon: LayoutDashboard, label: 'Dashboard'        },
+  { to: '/boss/tasks',             icon: CheckSquare,     label: 'Tasks'            },
+  { to: '/boss/calendar',          icon: Calendar,        label: 'Calendar'         },
+  { to: '/boss/meetings',          icon: CalendarDays,    label: 'Meetings'         },
+  { to: '/boss/coaches-calendar',  icon: CalendarRange,   label: 'Coaches Cal'      },
+  { to: '/boss/ideas',             icon: Lightbulb,       label: 'Ideas'            },
+  { to: '/boss/dump',              icon: Brain,           label: 'Brain Dump'       },
+  { to: '/boss/team-hours',        icon: Users,           label: 'Team Hours'       },
 ]
 
 export default function Nav() {

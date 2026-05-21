@@ -9,6 +9,7 @@ import TimesheetPage from './components/pages/TimesheetPage'
 import BossDashboardPage from './components/pages/boss/BossDashboardPage'
 import MeetingsPage from './components/pages/boss/MeetingsPage'
 import TeamHoursPage from './components/pages/boss/TeamHoursPage'
+import CoachesCalendarPage from './components/pages/boss/CoachesCalendarPage'
 
 export default function App() {
   return (
@@ -25,13 +26,15 @@ export default function App() {
               <Route path="/ideas" element={<IdeasPage />} />
               <Route path="/dump" element={<BrainDumpPage />} />
               <Route path="/timesheet" element={<TimesheetPage />} />
+              <Route path="/meetings" element={<MeetingsPage workspace="shaniah" />} />
               {/* Stacey */}
               <Route path="/boss" element={<BossDashboardPage />} />
               <Route path="/boss/tasks" element={<TasksPage workspace="stacey" />} />
-              <Route path="/boss/calendar" element={<CalendarPage />} />
+              <Route path="/boss/calendar" element={<CalendarPage calendarEmail="stacey@promotableyou.com.au" />} />
               <Route path="/boss/ideas" element={<IdeasPage workspace="stacey" />} />
               <Route path="/boss/dump" element={<BrainDumpPage workspace="stacey" />} />
-              <Route path="/boss/meetings" element={<MeetingsPage />} />
+              <Route path="/boss/meetings" element={<MeetingsPage workspace="stacey" />} />
+              <Route path="/boss/coaches-calendar" element={<CoachesCalendarPage />} />
               <Route path="/boss/team-hours" element={<TeamHoursPage />} />
             </Routes>
           </div>
