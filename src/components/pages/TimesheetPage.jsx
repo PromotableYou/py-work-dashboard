@@ -19,12 +19,12 @@ const TYPE_STYLE = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getMostRecentFortnight() {
   const today = new Date()
-  const day = today.getDay()
-  const diffToMon = day === 0 ? -6 : 1 - day
-  const lastMon = new Date(today)
-  lastMon.setDate(today.getDate() + diffToMon)
-  lastMon.setHours(0, 0, 0, 0)
-  return lastMon
+  const anchor = new Date('2025-01-06') // known pay period Monday
+  const diff = Math.floor((today - anchor) / (1000 * 60 * 60 * 24 * 14))
+  const start = new Date(anchor)
+  start.setDate(anchor.getDate() + diff * 14)
+  start.setHours(0, 0, 0, 0)
+  return start
 }
 
 function addDays(date, n) {
