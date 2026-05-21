@@ -20,6 +20,7 @@ const BOSS_LINKS = [
   { to: '/stacey/calendar',           icon: Calendar,        label: 'Calendar'    },
   { to: '/stacey/meetings',           icon: CalendarDays,    label: 'Meetings'    },
   { to: '/stacey/coaches-calendar',   icon: CalendarRange,   label: 'Coaches Cal' },
+  { to: '/stacey/roster',             icon: ClipboardList,   label: 'Roster'      },
   { to: '/stacey/notes',              icon: StickyNote,      label: 'Notes'       },
   { to: '/stacey/ideas',              icon: Lightbulb,       label: 'Ideas'       },
   { to: '/stacey/dump',               icon: Brain,           label: 'Brain Dump'  },

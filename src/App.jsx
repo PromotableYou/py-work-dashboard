@@ -41,6 +41,7 @@ export default function App() {
               <Route path="/stacey/meetings" element={<MeetingsPage workspace="stacey" />} />
               <Route path="/stacey/notes" element={<NotesPage workspace="stacey" />} />
               <Route path="/stacey/coaches-calendar" element={<CoachesCalendarPage />} />
+              <Route path="/stacey/roster" element={<RosterPage readOnly />} />
               <Route path="/stacey/team-hours" element={<TeamHoursPage />} />
             </Routes>
           </div>

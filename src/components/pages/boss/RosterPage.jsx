@@ -109,7 +109,7 @@ function PaletteChip({ st, onDelete, onRename }) {
 }
 
 // ─── Placed session block (with inline time + topic editing) ─────────────────
-function SessionBlock({ block, onDelete, onUpdate }) {
+function SessionBlock({ block, onDelete, onUpdate, readOnly }) {
   const [editingTime,  setEditingTime]  = useState(false)
   const [editingTopic, setEditingTopic] = useState(false)
   const [time,  setTime]  = useState(block.time  || '')
@@ -136,17 +136,19 @@ function SessionBlock({ block, onDelete, onUpdate }) {
       className="group relative rounded-lg px-2 py-1.5 mb-1 last:mb-0 shadow-sm"
       style={{ backgroundColor: block.color, color: fg }}
     >
-      {/* Delete button */}
-      <button
-        onClick={() => onDelete(block.id)}
-        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity z-10 hidden group-hover:flex"
-      >
-        <X className="w-2.5 h-2.5" />
-      </button>
+      {/* Delete button — hidden in read-only */}
+      {!readOnly && (
+        <button
+          onClick={() => onDelete(block.id)}
+          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity z-10 hidden group-hover:flex"
+        >
+          <X className="w-2.5 h-2.5" />
+        </button>
+      )}
 
       {/* Time row */}
       <div className="flex items-center gap-1 mb-0.5">
-        {editingTime ? (
+        {!readOnly && editingTime ? (
           <input
             ref={timeRef}
             value={time}
@@ -158,21 +160,21 @@ function SessionBlock({ block, onDelete, onUpdate }) {
             style={{ color: fg }}
           />
         ) : (
-          <button
-            onClick={() => setEditingTime(true)}
-            className="text-[10px] font-bold opacity-80 hover:opacity-100 transition-opacity"
+          <span
+            onClick={!readOnly ? () => setEditingTime(true) : undefined}
+            className={`text-[10px] font-bold opacity-80 ${!readOnly ? 'hover:opacity-100 cursor-pointer' : ''} transition-opacity`}
             style={{ color: fg }}
           >
-            {time || <span className="opacity-40">+ time</span>}
-          </button>
+            {time || (!readOnly && <span className="opacity-40">+ time</span>)}
+          </span>
         )}
       </div>
 
       {/* Session name */}
       <p className="text-xs font-semibold leading-tight">{block.session_name}</p>
 
-      {/* Topic row (always shown so you can add one) */}
-      {editingTopic ? (
+      {/* Topic row */}
+      {!readOnly && editingTopic ? (
         <input
           ref={topicRef}
           value={topic}
@@ -184,25 +186,26 @@ function SessionBlock({ block, onDelete, onUpdate }) {
           style={{ color: fg }}
         />
       ) : (
-        <button
-          onClick={() => setEditingTopic(true)}
-          className="mt-0.5 text-[10px] opacity-70 hover:opacity-100 transition-opacity text-left w-full"
+        <span
+          onClick={!readOnly ? () => setEditingTopic(true) : undefined}
+          className={`mt-0.5 text-[10px] opacity-70 ${!readOnly ? 'hover:opacity-100 cursor-pointer' : ''} transition-opacity block`}
           style={{ color: fg }}
         >
-          {topic || <span className="opacity-40">+ topic</span>}
-        </button>
+          {topic || (!readOnly && <span className="opacity-40">+ topic</span>)}
+        </span>
       )}
     </div>
   )
 }
 
 // ─── Drop cell ───────────────────────────────────────────────────────────────
-function DropCell({ coachName, dayKey, blocks, onDrop, onDelete, onUpdate, isToday }) {
+function DropCell({ coachName, dayKey, blocks, onDrop, onDelete, onUpdate, isToday, readOnly }) {
   const [over, setOver] = useState(false)
 
-  function handleDragOver(e) { e.preventDefault(); setOver(true) }
+  function handleDragOver(e) { if (readOnly) return; e.preventDefault(); setOver(true) }
   function handleDragLeave()  { setOver(false) }
   function handleDrop(e) {
+    if (readOnly) return
     e.preventDefault(); setOver(false)
     try { onDrop(coachName, dayKey, JSON.parse(e.dataTransfer.getData('application/json'))) } catch {}
   }
@@ -217,9 +220,9 @@ function DropCell({ coachName, dayKey, blocks, onDrop, onDelete, onUpdate, isTod
       }`}
     >
       {blocks.map(b => (
-        <SessionBlock key={b.id} block={b} onDelete={onDelete} onUpdate={onUpdate} />
+        <SessionBlock key={b.id} block={b} onDelete={onDelete} onUpdate={onUpdate} readOnly={readOnly} />
       ))}
-      {over && (
+      {!readOnly && over && (
         <div className="border-2 border-dashed border-blush-300 rounded-lg h-8 flex items-center justify-center mt-1">
           <span className="text-[10px] text-blush-400">Drop here</span>
         </div>
@@ -229,7 +232,7 @@ function DropCell({ coachName, dayKey, blocks, onDrop, onDelete, onUpdate, isTod
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function RosterPage() {
+export default function RosterPage({ readOnly = false }) {
   const [weekOffset, setWeekOffset]     = useState(0)
   const [coaches, setCoaches]           = useState([])
   const [blocks, setBlocks]             = useState([])
@@ -385,9 +388,11 @@ export default function RosterPage() {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-          <button onClick={handleCopyLastWeek} className="text-sm border border-sand-200 bg-white hover:bg-sand-50 text-sand-600 px-3 py-2 rounded-xl transition-colors">
-            Copy last week
-          </button>
+          {!readOnly && (
+            <button onClick={handleCopyLastWeek} className="text-sm border border-sand-200 bg-white hover:bg-sand-50 text-sand-600 px-3 py-2 rounded-xl transition-colors">
+              Copy last week
+            </button>
+          )}
           <button onClick={() => window.print()} className="flex items-center gap-2 bg-blush-500 hover:bg-blush-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
             <Printer className="w-4 h-4" /> Print / PDF
           </button>
@@ -396,8 +401,8 @@ export default function RosterPage() {
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl no-print">{error}</div>}
 
-      {/* Session type palette */}
-      <div className="bg-white border border-sand-200 rounded-2xl p-4 no-print">
+      {/* Session type palette — hidden for read-only view */}
+      {!readOnly && <div className="bg-white border border-sand-200 rounded-2xl p-4 no-print">
         <div className="flex items-center gap-2 mb-3">
           <p className="text-xs font-bold text-sand-500 uppercase tracking-widest">Session Types</p>
           <p className="text-[10px] text-sand-400">— drag onto the roster · click time/topic on a block to edit</p>
@@ -438,7 +443,7 @@ export default function RosterPage() {
             </button>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Roster grid */}
       {coaches.length === 0 ? (
@@ -488,6 +493,7 @@ export default function RosterPage() {
                         onDelete={handleDeleteBlock}
                         onUpdate={handleUpdateBlock}
                         isToday={toISO(dayDates[di])===TODAY}
+                        readOnly={readOnly}
                       />
                     ))}
                   </tr>
