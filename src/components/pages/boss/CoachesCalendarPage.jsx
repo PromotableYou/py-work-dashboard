@@ -1,6 +1,33 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
-import { getCoaches, addCoach, deleteCoach, getCoachHours, upsertCoachHourRow } from '../../../lib/supabase'
+import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle, Calendar, ExternalLink, RefreshCw } from 'lucide-react'
+import { getCoaches, addCoach, deleteCoach, updateCoach, getCoachHours, upsertCoachHourRow } from '../../../lib/supabase'
+
+const CAL_MODES = [
+  { label: 'Day',    value: 'DAY'    },
+  { label: 'Week',   value: 'WEEK'   },
+  { label: 'Month',  value: 'MONTH'  },
+  { label: 'Agenda', value: 'AGENDA' },
+]
+
+// Pull the calendar ID out of a pasted embed code or raw URL
+function parseEmbedCode(input) {
+  const trimmed = input.trim()
+  // Full iframe embed code — extract the src="..." attribute
+  const iframeSrc = trimmed.match(/src="(https:\/\/calendar\.google\.com[^"]+)"/)
+  const url = iframeSrc ? iframeSrc[1] : trimmed
+  // Extract the src= query param (the actual calendar ID)
+  const srcParam = url.match(/[?&]src=([^&]+)/)
+  if (srcParam) return decodeURIComponent(srcParam[1])
+  // Fallback — treat the whole thing as the calendar ID
+  return trimmed || null
+}
+
+function buildEmbedUrl(coaches, mode) {
+  const withCal = coaches.filter(c => c.google_calendar_id)
+  if (!withCal.length) return null
+  const srcs = withCal.map(c => `src=${encodeURIComponent(c.google_calendar_id)}`).join('&')
+  return `https://calendar.google.com/calendar/embed?${srcs}&ctz=Australia%2FBrisbane&showTitle=0&showNav=1&showPrint=0&showTabs=1&showCalendars=1&showTz=0&mode=${mode}`
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function localISO(date = new Date()) {
@@ -95,6 +122,9 @@ export default function CoachesCalendarPage() {
   const [error, setError] = useState(null)
   const [showAddCoach, setShowAddCoach] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newEmbed, setNewEmbed] = useState('')
+  const [calMode, setCalMode] = useState('WEEK')
+  const [embedKey, setEmbedKey] = useState(0)
   const [periodOffset, setPeriodOffset] = useState(0)
 
   const baseStart = getPayPeriodStart(new Date())
@@ -136,18 +166,28 @@ export default function CoachesCalendarPage() {
     if (!newName.trim()) return
     try {
       const color = COACH_COLORS[coaches.length % COACH_COLORS.length]
-      const saved = await addCoach({ name: newName.trim(), color })
+      const calId = newEmbed.trim() ? parseEmbedCode(newEmbed) : null
+      const saved = await addCoach({ name: newName.trim(), color, google_calendar_id: calId })
       setCoaches(prev => [...prev, saved])
       setNewName('')
+      setNewEmbed('')
       setShowAddCoach(false)
+      if (calId) setEmbedKey(k => k + 1)
     } catch (e) { setError(e.message) }
   }
 
   async function handleDeleteCoach(id) {
     if (!window.confirm('Remove this coach? Their hours history will remain.')) return
-    try { await deleteCoach(id); setCoaches(prev => prev.filter(c => c.id !== id)) }
+    try {
+      await deleteCoach(id)
+      setCoaches(prev => prev.filter(c => c.id !== id))
+      setEmbedKey(k => k + 1)
+    }
     catch (e) { setError(e.message) }
   }
+
+  const embedUrl = buildEmbedUrl(coaches, calMode)
+  const calCoaches = coaches.filter(c => c.google_calendar_id)
 
   // Totals
   function coachTotal(coachName) {
@@ -196,17 +236,77 @@ export default function CoachesCalendarPage() {
       {/* Add coach */}
       {showAddCoach && (
         <div className="bg-white border border-sand-200 rounded-2xl p-5">
-          <form onSubmit={handleAddCoach} className="flex gap-3">
+          <h2 className="font-semibold text-sand-900 mb-3">Add a Coach</h2>
+          <form onSubmit={handleAddCoach} className="space-y-3">
             <input
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="Coach name…"
               autoFocus
-              className="flex-1 text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-warm-300 focus:outline-none"
+              className="w-full text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-warm-300 focus:outline-none"
             />
-            <button type="button" onClick={() => setShowAddCoach(false)} className="text-sm text-sand-500 px-3">Cancel</button>
-            <button type="submit" className="text-sm bg-warm-500 hover:bg-warm-600 text-white px-4 py-2 rounded-xl font-medium transition-colors">Add</button>
+            <div>
+              <label className="block text-xs text-sand-500 mb-1">
+                Google Calendar embed code <span className="text-sand-400">(optional — paste the &lt;iframe&gt; code from Google Calendar settings)</span>
+              </label>
+              <textarea
+                value={newEmbed}
+                onChange={e => setNewEmbed(e.target.value)}
+                placeholder='Paste embed code here, e.g. <iframe src="https://calendar.google.com/calendar/embed?src=..." ...></iframe>'
+                rows={3}
+                className="w-full text-xs bg-sand-50 border border-sand-200 rounded-lg px-3 py-2 text-sand-700 placeholder-sand-400 focus:ring-2 focus:ring-warm-300 focus:outline-none resize-none font-mono"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => { setShowAddCoach(false); setNewEmbed('') }} className="text-sm text-sand-500 px-3 py-2">Cancel</button>
+              <button type="submit" className="text-sm bg-warm-500 hover:bg-warm-600 text-white px-4 py-2 rounded-xl font-medium transition-colors">Add Coach</button>
+            </div>
           </form>
+        </div>
+      )}
+
+      {/* Combined calendar embed */}
+      {calCoaches.length > 0 && (
+        <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-sand-100">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-warm-400" />
+              <span className="font-semibold text-sand-900 text-sm">Coaches Calendars</span>
+              <div className="flex gap-1 ml-2">
+                {calCoaches.map(c => (
+                  <span key={c.id} className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: c.color || '#e5a0a0' }}>
+                    {c.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex bg-sand-50 border border-sand-200 rounded-lg p-0.5 gap-0.5">
+                {CAL_MODES.map(m => (
+                  <button key={m.value} onClick={() => setCalMode(m.value)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${calMode === m.value ? 'bg-white shadow-sm text-sand-900' : 'text-sand-400 hover:text-sand-700'}`}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setEmbedKey(k => k + 1)} title="Refresh" className="p-1.5 rounded-lg text-sand-400 hover:text-sand-700 hover:bg-sand-100 transition-colors">
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+              <a href={embedUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-sand-400 hover:text-blush-500 hover:bg-blush-50 transition-colors">
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+          <iframe
+            key={`${embedKey}-${calMode}`}
+            src={embedUrl}
+            style={{ border: 0 }}
+            width="100%"
+            height="650"
+            frameBorder="0"
+            scrolling="no"
+            title="Coaches Calendars"
+          />
         </div>
       )}
 
