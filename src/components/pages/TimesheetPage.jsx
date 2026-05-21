@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, AlertCircle, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, AlertCircle, Check, Download, Printer, Send } from 'lucide-react'
 import { getTimelog, upsertTimelogRow, upsertTeamHourRow } from '../../lib/supabase'
 
 const STD_HOURS = 7.6
+const STACEY_EMAIL = 'stacey@promotableyou.com.au'
 
 const DAY_TYPES = ['Normal', 'Annual Leave', 'Sick Leave', 'Personal Leave', 'Public Holiday', 'Unpaid Leave', 'RDO']
 
@@ -48,11 +49,86 @@ function buildFortnight(startMon) {
   return days
 }
 
-// "worked" = clock_in field is non-empty (we store a sentinel)
 function isWorked(row) { return !!(row.clock_in) }
-function workedHours(row) {
-  if (!isWorked(row)) return 0
-  return STD_HOURS
+function workedHours(row) { return isWorked(row) ? STD_HOURS : 0 }
+
+// ─── Export helpers ───────────────────────────────────────────────────────────
+function buildSummary(fortnight, rows) {
+  const allRows    = fortnight.map(d => ({ ...(rows[d.date] || { type: 'Normal' }), date: d.date, dayName: d.dayName }))
+  const totalHours = allRows.reduce((s, r) => s + workedHours(r), 0)
+  const workedDays = allRows.filter(r => isWorked(r)).length
+  const leaveDays  = allRows.filter(r => !isWorked(r) && r.type !== 'Normal').length
+  return { allRows, totalHours, workedDays, leaveDays }
+}
+
+function downloadCSV(fortnight, rows, cycleLabel) {
+  const { allRows, totalHours, workedDays, leaveDays } = buildSummary(fortnight, rows)
+
+  const lines = [
+    ['Timesheet — Shaniah Langridge'],
+    [`Period: ${cycleLabel}`],
+    [],
+    ['Date', 'Day', 'Status', 'Type', 'Hours', 'Notes'],
+    ...allRows.map(r => [
+      r.date,
+      r.dayName,
+      isWorked(r) ? 'Worked' : r.type !== 'Normal' ? r.type : 'Not worked',
+      r.type || 'Normal',
+      workedHours(r).toFixed(1),
+      r.notes || '',
+    ]),
+    [],
+    ['SUMMARY'],
+    ['Total Hours', totalHours.toFixed(1)],
+    ['Standard Hours', (STD_HOURS * 10).toFixed(1)],
+    ['Worked Days', workedDays],
+    ['Leave Days', leaveDays],
+  ]
+
+  const csv = lines.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `timesheet-shaniah-${toISO(new Date())}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function sendEmail(fortnight, rows, cycleLabel) {
+  const { allRows, totalHours, workedDays, leaveDays } = buildSummary(fortnight, rows)
+
+  const dayLines = allRows.map(r => {
+    const dateStr = new Date(r.date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
+    const status  = isWorked(r) ? `Worked (${STD_HOURS}h)` : r.type !== 'Normal' ? r.type : 'Not worked'
+    const note    = r.notes ? ` — ${r.notes}` : ''
+    return `${dateStr}: ${status}${note}`
+  })
+
+  const body = [
+    `Hi Stacey,`,
+    ``,
+    `Please find my timesheet for the pay period ${cycleLabel}.`,
+    ``,
+    `SUMMARY`,
+    `Total Hours: ${totalHours.toFixed(1)}h (of ${(STD_HOURS * 10).toFixed(1)}h standard)`,
+    `Days Worked: ${workedDays}`,
+    leaveDays > 0 ? `Leave Days: ${leaveDays}` : null,
+    ``,
+    `DAILY BREAKDOWN`,
+    `Week 1`,
+    ...dayLines.slice(0, 5),
+    ``,
+    `Week 2`,
+    ...dayLines.slice(5, 10),
+    ``,
+    `Kind regards,`,
+    `Shaniah`,
+  ].filter(l => l !== null).join('\n')
+
+  const subject = encodeURIComponent(`Timesheet — Shaniah — ${cycleLabel}`)
+  const bodyEnc = encodeURIComponent(body)
+  window.location.href = `mailto:${STACEY_EMAIL}?subject=${subject}&body=${bodyEnc}`
 }
 
 // ─── Day card ─────────────────────────────────────────────────────────────────
@@ -75,20 +151,17 @@ function DayCard({ day, row, onChange, isToday }) {
       isToday ? 'ring-2 ring-blush-400 ring-offset-1' : ''
     } ${worked || isLeave ? 'shadow-sm' : 'opacity-70'}`}>
 
-      {/* Today pill */}
       {isToday && (
         <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-blush-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap">
           Today
         </span>
       )}
 
-      {/* Day + date */}
       <p className="text-xs font-bold text-sand-700 text-center">{day.dayName.slice(0, 3).toUpperCase()}</p>
       <p className="text-[10px] text-sand-400 text-center mt-0.5">
         {new Date(day.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
       </p>
 
-      {/* Big tick */}
       <div className="flex justify-center my-3">
         <button
           onClick={toggleWorked}
@@ -104,7 +177,6 @@ function DayCard({ day, row, onChange, isToday }) {
         </button>
       </div>
 
-      {/* Type badge / selector */}
       <div className="flex justify-center">
         <select
           value={type}
@@ -115,13 +187,94 @@ function DayCard({ day, row, onChange, isToday }) {
         </select>
       </div>
 
-      {/* Notes */}
       <input
         value={row.notes || ''}
         onChange={e => onChange({ notes: e.target.value })}
         placeholder="Notes…"
         className="mt-2.5 w-full text-[11px] bg-white/60 border border-sand-200 rounded-lg px-2 py-1.5 text-sand-700 placeholder-sand-300 focus:outline-none focus:ring-2 focus:ring-blush-200"
       />
+    </div>
+  )
+}
+
+// ─── Print table (hidden on screen, shown on print) ───────────────────────────
+function PrintTable({ fortnight, rows, cycleLabel }) {
+  const week1 = fortnight.slice(0, 5)
+  const week2 = fortnight.slice(5, 10)
+  const { totalHours, workedDays, leaveDays } = buildSummary(fortnight, rows)
+
+  function renderWeek(days, label) {
+    return (
+      <>
+        <tr style={{ backgroundColor: '#f5f0eb' }}>
+          <td colSpan={4} style={{ padding: '6px 10px', fontWeight: 'bold', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: '#a07060' }}>{label}</td>
+        </tr>
+        {days.map(d => {
+          const row  = rows[d.date] || {}
+          const worked = isWorked(row)
+          const type   = row.type || 'Normal'
+          const status = worked ? 'Worked' : type !== 'Normal' ? type : '—'
+          const hours  = workedHours(row)
+          return (
+            <tr key={d.date} style={{ borderBottom: '1px solid #e8e2dc' }}>
+              <td style={{ padding: '6px 10px', fontSize: 11 }}>{new Date(d.date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}</td>
+              <td style={{ padding: '6px 10px', fontSize: 11 }}>{status}</td>
+              <td style={{ padding: '6px 10px', fontSize: 11, textAlign: 'right' }}>{hours > 0 ? `${hours}h` : '—'}</td>
+              <td style={{ padding: '6px 10px', fontSize: 11, color: '#888' }}>{row.notes || ''}</td>
+            </tr>
+          )
+        })}
+      </>
+    )
+  }
+
+  return (
+    <div className="hidden print:block" style={{ fontFamily: 'system-ui, sans-serif' }}>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 'bold', margin: 0 }}>Timesheet — Shaniah Langridge</h1>
+        <p style={{ fontSize: 12, color: '#888', margin: '4px 0 0' }}>Pay period: {cycleLabel}</p>
+      </div>
+
+      {/* Days table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24, border: '1px solid #e8e2dc' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#faf7f4' }}>
+            <th style={{ padding: '8px 10px', fontSize: 11, fontWeight: 'bold', textAlign: 'left', borderBottom: '2px solid #e8e2dc' }}>Date</th>
+            <th style={{ padding: '8px 10px', fontSize: 11, fontWeight: 'bold', textAlign: 'left', borderBottom: '2px solid #e8e2dc' }}>Status</th>
+            <th style={{ padding: '8px 10px', fontSize: 11, fontWeight: 'bold', textAlign: 'right', borderBottom: '2px solid #e8e2dc' }}>Hours</th>
+            <th style={{ padding: '8px 10px', fontSize: 11, fontWeight: 'bold', textAlign: 'left', borderBottom: '2px solid #e8e2dc' }}>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {renderWeek(week1, 'Week 1')}
+          {renderWeek(week2, 'Week 2')}
+        </tbody>
+      </table>
+
+      {/* Summary */}
+      <table style={{ borderCollapse: 'collapse', border: '1px solid #e8e2dc', minWidth: 280 }}>
+        <thead>
+          <tr style={{ backgroundColor: '#faf7f4' }}>
+            <th colSpan={2} style={{ padding: '8px 14px', fontSize: 11, fontWeight: 'bold', textAlign: 'left', borderBottom: '2px solid #e8e2dc' }}>Summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            ['Total Hours', `${totalHours.toFixed(1)}h`],
+            ['Standard Hours', `${(STD_HOURS * 10).toFixed(1)}h`],
+            ['Days Worked', workedDays],
+            leaveDays > 0 ? ['Leave Days', leaveDays] : null,
+          ].filter(Boolean).map(([label, val]) => (
+            <tr key={label} style={{ borderBottom: '1px solid #e8e2dc' }}>
+              <td style={{ padding: '6px 14px', fontSize: 11, color: '#555' }}>{label}</td>
+              <td style={{ padding: '6px 14px', fontSize: 11, fontWeight: 'bold', textAlign: 'right' }}>{val}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p style={{ fontSize: 10, color: '#aaa', marginTop: 32 }}>Generated {new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
     </div>
   )
 }
@@ -146,7 +299,7 @@ function WeekBar({ label, days, rows }) {
 
 // ─── Pay Summary ──────────────────────────────────────────────────────────────
 function PaySummary({ fortnight, rows }) {
-  const allRows = fortnight.map(d => ({ ...(rows[d.date] || { type: 'Normal' }), date: d.date }))
+  const allRows    = fortnight.map(d => ({ ...(rows[d.date] || { type: 'Normal' }), date: d.date }))
   const totalHours = allRows.reduce((s, r) => s + workedHours(r), 0)
   const workedDays = allRows.filter(r => isWorked(r)).length
   const leaveDays  = allRows.filter(r => !isWorked(r) && r.type !== 'Normal').length
@@ -159,8 +312,7 @@ function PaySummary({ fortnight, rows }) {
   }, {})
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      {/* Big hours stat */}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:hidden">
       <div className="bg-gradient-to-br from-blush-500 to-blush-400 rounded-2xl p-5 text-white">
         <p className="text-xs font-semibold text-white/70 uppercase tracking-widest">Total Hours</p>
         <p className="text-4xl font-bold mt-1">{totalHours.toFixed(1)}<span className="text-xl font-normal text-white/70">h</span></p>
@@ -171,7 +323,6 @@ function PaySummary({ fortnight, rows }) {
         </div>
       </div>
 
-      {/* Days breakdown */}
       <div className="bg-white border border-sand-200 rounded-2xl p-5">
         <p className="text-xs font-bold text-sand-400 uppercase tracking-widest mb-3">Days This Fortnight</p>
         <div className="space-y-2">
@@ -194,7 +345,6 @@ function PaySummary({ fortnight, rows }) {
         </div>
       </div>
 
-      {/* Type breakdown */}
       <div className="bg-white border border-sand-200 rounded-2xl p-5">
         <p className="text-xs font-bold text-sand-400 uppercase tracking-widest mb-3">By Type</p>
         <div className="space-y-2">
@@ -220,11 +370,10 @@ export default function TimesheetPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError]   = useState(null)
 
-  const fortnight = buildFortnight(cycleStart)
-  const todayISO  = toISO(new Date())
-  const week1     = fortnight.slice(0, 5)
-  const week2     = fortnight.slice(5, 10)
-
+  const fortnight  = buildFortnight(cycleStart)
+  const todayISO   = toISO(new Date())
+  const week1      = fortnight.slice(0, 5)
+  const week2      = fortnight.slice(5, 10)
   const cycleLabel = `${cycleStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} — ${addDays(cycleStart, 13).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
   useEffect(() => {
@@ -244,7 +393,6 @@ export default function TimesheetPage() {
     try {
       const saved = await upsertTimelogRow(updated)
       setRows(prev => ({ ...prev, [date]: saved }))
-      // Mirror to Stacey's team hours so her tracker stays in sync
       await upsertTeamHourRow({
         person_name: 'Shaniah',
         date,
@@ -263,57 +411,92 @@ export default function TimesheetPage() {
 
   return (
     <div className="space-y-6 pb-6">
+      <style>{`
+        @media print {
+          aside, nav, .print\\:hidden { display: none !important; }
+          main { margin-left: 0 !important; }
+          .max-w-6xl { max-width: 100% !important; padding: 0 !important; }
+          @page { size: A4 portrait; margin: 1.5cm; }
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-3 print:hidden">
         <div>
           <h1 className="text-xl font-bold text-sand-900">Time Log</h1>
           <p className="text-sand-400 text-sm mt-0.5">Shaniah — {cycleLabel}</p>
         </div>
-        <div className="flex items-center gap-1 bg-white border border-sand-200 rounded-xl p-1">
-          <button onClick={() => setCycleStart(d => { const n = new Date(d); n.setDate(n.getDate() - 14); return n })}
-            className="w-7 h-7 rounded-lg hover:bg-sand-100 flex items-center justify-center text-sand-600 transition-colors">
-            <ChevronLeft className="w-4 h-4" />
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Pay period navigator */}
+          <div className="flex items-center gap-1 bg-white border border-sand-200 rounded-xl p-1">
+            <button onClick={() => setCycleStart(d => { const n = new Date(d); n.setDate(n.getDate() - 14); return n })}
+              className="w-7 h-7 rounded-lg hover:bg-sand-100 flex items-center justify-center text-sand-600 transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-medium text-sand-700 px-2 whitespace-nowrap">{cycleLabel}</span>
+            <button onClick={() => setCycleStart(d => { const n = new Date(d); n.setDate(n.getDate() + 14); return n })}
+              className="w-7 h-7 rounded-lg hover:bg-sand-100 flex items-center justify-center text-sand-600 transition-colors">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Export buttons */}
+          <button
+            onClick={() => downloadCSV(fortnight, rows, cycleLabel)}
+            className="flex items-center gap-1.5 text-sm border border-sand-200 bg-white hover:bg-sand-50 text-sand-600 px-3 py-2 rounded-xl transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" /> CSV
           </button>
-          <span className="text-xs font-medium text-sand-700 px-2 whitespace-nowrap">{cycleLabel}</span>
-          <button onClick={() => setCycleStart(d => { const n = new Date(d); n.setDate(n.getDate() + 14); return n })}
-            className="w-7 h-7 rounded-lg hover:bg-sand-100 flex items-center justify-center text-sand-600 transition-colors">
-            <ChevronRight className="w-4 h-4" />
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 text-sm border border-sand-200 bg-white hover:bg-sand-50 text-sand-600 px-3 py-2 rounded-xl transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" /> PDF
+          </button>
+          <button
+            onClick={() => sendEmail(fortnight, rows, cycleLabel)}
+            className="flex items-center gap-1.5 text-sm bg-blush-500 hover:bg-blush-600 text-white font-medium px-3 py-2 rounded-xl transition-colors"
+          >
+            <Send className="w-3.5 h-3.5" /> Send to Stacey
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl print:hidden">
           <AlertCircle className="w-4 h-4 shrink-0" />{error}
         </div>
       )}
 
-      {/* Week 1 */}
-      <div className="space-y-3">
-        <p className="text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 1</p>
-        <div className="grid grid-cols-5 gap-3">
-          {week1.map(d => (
-            <DayCard key={d.date} day={d} row={getRow(d.date)}
-              onChange={u => handleChange(d.date, u)} isToday={d.date === todayISO} />
-          ))}
+      {/* Screen view */}
+      <div className="print:hidden space-y-6">
+        <div className="space-y-3">
+          <p className="text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 1</p>
+          <div className="grid grid-cols-5 gap-3">
+            {week1.map(d => (
+              <DayCard key={d.date} day={d} row={getRow(d.date)}
+                onChange={u => handleChange(d.date, u)} isToday={d.date === todayISO} />
+            ))}
+          </div>
+          <WeekBar label="Week 1" days={week1} rows={rows} />
         </div>
-        <WeekBar label="Week 1" days={week1} rows={rows} />
+
+        <div className="space-y-3">
+          <p className="text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 2</p>
+          <div className="grid grid-cols-5 gap-3">
+            {week2.map(d => (
+              <DayCard key={d.date} day={d} row={getRow(d.date)}
+                onChange={u => handleChange(d.date, u)} isToday={d.date === todayISO} />
+            ))}
+          </div>
+          <WeekBar label="Week 2" days={week2} rows={rows} />
+        </div>
+
+        <PaySummary fortnight={fortnight} rows={rows} />
       </div>
 
-      {/* Week 2 */}
-      <div className="space-y-3">
-        <p className="text-[10px] font-bold text-blush-500 uppercase tracking-widest">Week 2</p>
-        <div className="grid grid-cols-5 gap-3">
-          {week2.map(d => (
-            <DayCard key={d.date} day={d} row={getRow(d.date)}
-              onChange={u => handleChange(d.date, u)} isToday={d.date === todayISO} />
-          ))}
-        </div>
-        <WeekBar label="Week 2" days={week2} rows={rows} />
-      </div>
-
-      {/* Pay summary */}
-      <PaySummary fortnight={fortnight} rows={rows} />
+      {/* Print view */}
+      <PrintTable fortnight={fortnight} rows={rows} cycleLabel={cycleLabel} />
     </div>
   )
 }
