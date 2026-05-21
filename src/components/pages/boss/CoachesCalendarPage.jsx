@@ -309,7 +309,7 @@ export default function CoachesCalendarPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-sand-900">Coach Hours</h1>
+          <h1 className="text-xl font-bold text-sand-900">Coaches Calendar</h1>
           <p className="text-sand-400 text-sm mt-0.5">{coaches.length} coach{coaches.length !== 1 ? 'es' : ''}</p>
         </div>
         <button
