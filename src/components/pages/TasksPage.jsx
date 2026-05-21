@@ -530,7 +530,7 @@ function Notepad({ subtasks, onToggleSub, recurringTasks, onAddRecurring, onDele
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function TasksPage() {
+export default function TasksPage({ workspace = 'shaniah' }) {
   const [projects, setProjects]       = useState([])
   const [subtasks, setSubtasks]       = useState([])
   const [recurring, setRecurring]     = useState([])
@@ -541,7 +541,7 @@ export default function TasksPage() {
   const [newProject, setNewProject]   = useState({ name: '', priority: 'medium', due_date: '', color: '#F0457A' })
 
   useEffect(() => {
-    Promise.all([getProjects(), getSubtasks(), getRecurringTasks()])
+    Promise.all([getProjects(workspace), getSubtasks(workspace), getRecurringTasks(workspace)])
       .then(([p, s, r]) => { setProjects(p); setSubtasks(s); setRecurring(r) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -555,7 +555,7 @@ export default function TasksPage() {
     e.preventDefault()
     if (!newProject.name.trim()) return
     try {
-      const s = await addProject({ ...newProject, due_date: newProject.due_date || null, done: false, notes: '' })
+      const s = await addProject({ ...newProject, due_date: newProject.due_date || null, done: false, notes: '', workspace })
       setProjects(p => [...p, s])
       setNewProject({ name: '', priority: 'medium', due_date: '', color: '#F0457A' })
       setShowAdd(false)
@@ -582,7 +582,7 @@ export default function TasksPage() {
   }
 
   async function handleAddSub(projectId, text) {
-    try { const s = await addSubtask({ project_id: projectId, text, completed: false }); setSubtasks(p => [...p, s]) }
+    try { const s = await addSubtask({ project_id: projectId, text, completed: false, workspace }); setSubtasks(p => [...p, s]) }
     catch (e) { setError(e.message) }
   }
   async function handleToggleSub(sub) {
@@ -601,7 +601,7 @@ export default function TasksPage() {
   }
 
   async function handleAddRecurring(text) {
-    try { const r = await addRecurringTask(text); setRecurring(p => [...p, r]) }
+    try { const r = await addRecurringTask(text, workspace); setRecurring(p => [...p, r]) }
     catch (e) { setError(e.message) }
   }
   async function handleDeleteRecurring(id) {

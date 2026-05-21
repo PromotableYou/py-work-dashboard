@@ -95,7 +95,7 @@ function ConvertPanel({ defaultName, onConvert, onCancel }) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function IdeasPage() {
+export default function IdeasPage({ workspace = 'shaniah' }) {
   const [ideas, setIdeas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -109,7 +109,7 @@ export default function IdeasPage() {
   )
 
   useEffect(() => {
-    getIdeas()
+    getIdeas(workspace)
       .then(setIdeas)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -122,7 +122,7 @@ export default function IdeasPage() {
     e.preventDefault()
     if (!form.title.trim()) return
     try {
-      const saved = await addIdea({ title: form.title, body: form.body, tag: form.tag, color: form.color })
+      const saved = await addIdea({ title: form.title, body: form.body, tag: form.tag, color: form.color, workspace })
       setIdeas(prev => [saved, ...prev])
       setForm({ title: '', body: '', tag: '', color: 0 })
       setShowForm(false)

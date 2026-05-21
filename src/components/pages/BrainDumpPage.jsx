@@ -87,7 +87,7 @@ function ConvertPanel({ defaultName, onConvert, onCancel }) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function BrainDumpPage() {
+export default function BrainDumpPage({ workspace = 'shaniah' }) {
   const [dumps, setDumps] = useState([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
@@ -100,7 +100,7 @@ export default function BrainDumpPage() {
   )
 
   useEffect(() => {
-    getDumps()
+    getDumps(workspace)
       .then(setDumps)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -111,7 +111,7 @@ export default function BrainDumpPage() {
     if (!text.trim()) return
     setSaving(true)
     try {
-      const saved = await addDump(text.trim())
+      const saved = await addDump(text.trim(), workspace)
       setDumps(prev => [saved, ...prev])
       setText('')
     } catch (e) { setError(e.message) }
