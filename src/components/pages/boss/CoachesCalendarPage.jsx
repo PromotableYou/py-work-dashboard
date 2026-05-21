@@ -1,86 +1,169 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Calendar, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react'
-import { getCalendars, addCalendar, deleteCalendar } from '../../../lib/supabase'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
+import { getCoaches, addCoach, deleteCoach, getCoachHours, upsertCoachHourRow } from '../../../lib/supabase'
 
-const MODES = [
-  { label: 'Day',    value: 'DAY'    },
-  { label: 'Week',   value: 'WEEK'   },
-  { label: 'Month',  value: 'MONTH'  },
-  { label: 'Agenda', value: 'AGENDA' },
-]
-
-// Google Calendar colour options (preset palette)
-const COLORS = [
-  { label: 'Flamingo',  hex: '#E67C73' },
-  { label: 'Tangerine', hex: '#F6BF26' },
-  { label: 'Sage',      hex: '#33B679' },
-  { label: 'Peacock',   hex: '#039BE5' },
-  { label: 'Blueberry', hex: '#3F51B5' },
-  { label: 'Lavender',  hex: '#7986CB' },
-  { label: 'Grape',     hex: '#8E24AA' },
-  { label: 'Graphite',  hex: '#616161' },
-]
-
-function buildEmbedUrl(calendars, mode) {
-  if (calendars.length === 0) return null
-  const params = new URLSearchParams({
-    ctz: 'Australia/Brisbane',
-    showTitle: '0',
-    showNav: '1',
-    showPrint: '0',
-    showTabs: '1',
-    showCalendars: '1',
-    showTz: '0',
-    mode,
-  })
-  const base = 'https://calendar.google.com/calendar/embed?'
-  // Multiple src + color params
-  const srcs = calendars.map(c => `src=${encodeURIComponent(c.google_calendar_id)}`).join('&')
-  const colors = calendars.map(c => `color=${encodeURIComponent(c.color || '#E67C73')}`).join('&')
-  return `${base}${srcs}&${colors}&${params.toString()}`
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function localISO(date = new Date()) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
+function addDays(date, n) {
+  const d = new Date(date)
+  d.setDate(d.getDate() + n)
+  return d
+}
+
+function getPayPeriodStart(date = new Date(), anchor = new Date('2025-01-06')) {
+  const diff = Math.floor((date - anchor) / (1000 * 60 * 60 * 24 * 14))
+  const start = new Date(anchor)
+  start.setDate(anchor.getDate() + diff * 14)
+  return start
+}
+
+function getFortnightDays(start) {
+  const days = []
+  let current = new Date(start)
+  while (days.length < 10) {
+    const dow = current.getDay()
+    if (dow !== 0 && dow !== 6) days.push(new Date(current))
+    current = addDays(current, 1)
+  }
+  return days
+}
+
+const COACH_COLORS = [
+  '#e5a0a0', '#f5c27a', '#a0c4e5', '#a0e5b0', '#c4a0e5',
+  '#e5c4a0', '#a0e5e5', '#e5a0c4', '#b0d4a0', '#d4a0d4',
+]
+
+const TODAY = localISO()
+
+// ─── Hour input cell ──────────────────────────────────────────────────────────
+function HourCell({ coachName, dateISO, value, onChange }) {
+  const [local, setLocal] = useState(value === 0 ? '' : String(value))
+  const timerRef = useRef(null)
+  const isToday = dateISO === TODAY
+
+  // Keep in sync if parent value changes (e.g. period switch)
+  useEffect(() => {
+    setLocal(value === 0 ? '' : String(value))
+  }, [value, dateISO])
+
+  function handleChange(e) {
+    const raw = e.target.value
+    if (raw === '' || /^\d*\.?\d?$/.test(raw)) setLocal(raw)
+  }
+
+  function handleBlur() {
+    const num = parseFloat(local) || 0
+    setLocal(num === 0 ? '' : String(num))
+    if (num !== value) onChange(coachName, dateISO, num)
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') e.target.blur()
+  }
+
+  return (
+    <td className={`px-1 py-1.5 text-center ${isToday ? 'bg-blush-50' : ''}`}>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={local}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        placeholder="–"
+        className={`w-11 text-center text-sm rounded-lg border py-1 focus:outline-none focus:ring-2 focus:ring-blush-300 transition-colors ${
+          parseFloat(local) > 0
+            ? 'bg-blush-50 border-blush-200 text-blush-700 font-semibold'
+            : 'bg-white border-sand-200 text-sand-300 placeholder-sand-200'
+        } ${isToday ? 'ring-1 ring-warm-300' : ''}`}
+      />
+    </td>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function CoachesCalendarPage() {
-  const [calendars, setCalendars] = useState([])
+  const [coaches, setCoaches] = useState([])
+  const [hoursData, setHoursData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [showForm, setShowForm] = useState(false)
-  const [mode, setMode] = useState('WEEK')
-  const [embedKey, setEmbedKey] = useState(0)
-  const [form, setForm] = useState({ name: '', google_calendar_id: '', color: '#E67C73' })
+  const [showAddCoach, setShowAddCoach] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [periodOffset, setPeriodOffset] = useState(0)
+
+  const baseStart = getPayPeriodStart(new Date())
+  const periodStart = addDays(baseStart, periodOffset * 14)
+  const periodEnd = addDays(periodStart, 13)
+  const days = getFortnightDays(periodStart)
+  const week1 = days.slice(0, 5)
+  const week2 = days.slice(5, 10)
+
+  const periodStartISO = localISO(periodStart)
+  const periodEndISO = localISO(periodEnd)
 
   useEffect(() => {
-    getCalendars()
-      .then(setCalendars)
+    Promise.all([getCoaches(), getCoachHours()])
+      .then(([c, h]) => { setCoaches(c); setHoursData(h) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
-  async function handleAdd(e) {
-    e.preventDefault()
-    if (!form.name.trim() || !form.google_calendar_id.trim()) return
+  // Lookup: "coachName|date" → hours value
+  const hoursLookup = {}
+  hoursData.forEach(r => { hoursLookup[`${r.coach_name}|${r.date}`] = parseFloat(r.hours) || 0 })
+
+  const getHours = (coachName, dateISO) => hoursLookup[`${coachName}|${dateISO}`] || 0
+
+  const handleCellChange = useCallback(async (coachName, dateISO, hours) => {
     try {
-      const saved = await addCalendar({
-        name: form.name.trim(),
-        google_calendar_id: form.google_calendar_id.trim(),
-        color: form.color,
+      const saved = await upsertCoachHourRow({ coach_name: coachName, date: dateISO, hours })
+      setHoursData(prev => {
+        const idx = prev.findIndex(r => r.coach_name === coachName && r.date === dateISO)
+        if (idx >= 0) { const next = [...prev]; next[idx] = saved; return next }
+        return [...prev, saved]
       })
-      setCalendars(prev => [...prev, saved])
-      setForm({ name: '', google_calendar_id: '', color: '#E67C73' })
-      setShowForm(false)
-      setEmbedKey(k => k + 1) // force iframe reload
     } catch (e) { setError(e.message) }
-  }
+  }, [])
 
-  async function handleDelete(id) {
+  async function handleAddCoach(e) {
+    e.preventDefault()
+    if (!newName.trim()) return
     try {
-      await deleteCalendar(id)
-      setCalendars(prev => prev.filter(c => c.id !== id))
-      setEmbedKey(k => k + 1)
+      const color = COACH_COLORS[coaches.length % COACH_COLORS.length]
+      const saved = await addCoach({ name: newName.trim(), color })
+      setCoaches(prev => [...prev, saved])
+      setNewName('')
+      setShowAddCoach(false)
     } catch (e) { setError(e.message) }
   }
 
-  const embedUrl = buildEmbedUrl(calendars, mode)
+  async function handleDeleteCoach(id) {
+    if (!window.confirm('Remove this coach? Their hours history will remain.')) return
+    try { await deleteCoach(id); setCoaches(prev => prev.filter(c => c.id !== id)) }
+    catch (e) { setError(e.message) }
+  }
+
+  // Totals
+  function coachTotal(coachName) {
+    return days.reduce((sum, d) => sum + getHours(coachName, localISO(d)), 0)
+  }
+  function coachWeekTotal(coachName, weekDays) {
+    return weekDays.reduce((sum, d) => sum + getHours(coachName, localISO(d)), 0)
+  }
+  function dayTotal(dayISO) {
+    return coaches.reduce((sum, c) => sum + getHours(c.name, dayISO), 0)
+  }
+  function grandTotal() {
+    return coaches.reduce((sum, c) => sum + coachTotal(c.name), 0)
+  }
+
+  const fmt = (n) => n === 0 ? '–' : n % 1 === 0 ? String(n) : n.toFixed(1)
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -93,17 +176,15 @@ export default function CoachesCalendarPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-sand-900">Coaches Calendars</h1>
-          <p className="text-sand-400 text-sm mt-0.5">{calendars.length} calendar{calendars.length !== 1 ? 's' : ''} connected</p>
+          <h1 className="text-xl font-bold text-sand-900">Coach Hours</h1>
+          <p className="text-sand-400 text-sm mt-0.5">{coaches.length} coach{coaches.length !== 1 ? 'es' : ''}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 bg-warm-500 hover:bg-warm-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Add Calendar
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddCoach(!showAddCoach)}
+          className="flex items-center gap-2 bg-warm-500 hover:bg-warm-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Add Coach
+        </button>
       </div>
 
       {error && (
@@ -112,140 +193,200 @@ export default function CoachesCalendarPage() {
         </div>
       )}
 
-      {/* Add form */}
-      {showForm && (
+      {/* Add coach */}
+      {showAddCoach && (
         <div className="bg-white border border-sand-200 rounded-2xl p-5">
-          <h2 className="font-semibold text-sand-900 mb-1">Connect a Calendar</h2>
-          <p className="text-xs text-sand-400 mb-4">
-            You need the coach's Google Calendar ID — they can find it in Google Calendar → Settings → their calendar → "Calendar ID" (looks like name@gmail.com or a long string ending in @group.calendar.google.com).
-          </p>
-          <form onSubmit={handleAdd} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-sand-500 mb-1">Coach Name</label>
-                <input
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Sarah Coach"
-                  autoFocus
-                  className="w-full text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-warm-300 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-sand-500 mb-1">Google Calendar ID</label>
-                <input
-                  value={form.google_calendar_id}
-                  onChange={e => setForm(f => ({ ...f, google_calendar_id: e.target.value }))}
-                  placeholder="e.g. coach@gmail.com"
-                  className="w-full text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-warm-300 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Colour picker */}
-            <div>
-              <label className="block text-xs text-sand-500 mb-2">Calendar Colour</label>
-              <div className="flex gap-2 flex-wrap">
-                {COLORS.map(c => (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, color: c.hex }))}
-                    title={c.label}
-                    className={`w-7 h-7 rounded-full transition-transform ${form.color === c.hex ? 'ring-2 ring-offset-2 ring-sand-500 scale-110' : 'hover:scale-105'}`}
-                    style={{ backgroundColor: c.hex }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowForm(false)} className="text-sm text-sand-500 hover:text-sand-700 px-3 py-2">Cancel</button>
-              <button type="submit" className="text-sm bg-warm-500 hover:bg-warm-600 text-white px-4 py-2 rounded-xl font-medium transition-colors">Add Calendar</button>
-            </div>
+          <form onSubmit={handleAddCoach} className="flex gap-3">
+            <input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="Coach name…"
+              autoFocus
+              className="flex-1 text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-warm-300 focus:outline-none"
+            />
+            <button type="button" onClick={() => setShowAddCoach(false)} className="text-sm text-sand-500 px-3">Cancel</button>
+            <button type="submit" className="text-sm bg-warm-500 hover:bg-warm-600 text-white px-4 py-2 rounded-xl font-medium transition-colors">Add</button>
           </form>
         </div>
       )}
 
-      {/* Connected calendars */}
-      {calendars.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {calendars.map(cal => (
-            <div
-              key={cal.id}
-              className="flex items-center gap-2 bg-white border border-sand-200 rounded-full px-3 py-1.5 group"
-            >
-              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cal.color || '#E67C73' }} />
-              <span className="text-sm font-medium text-sand-700">{cal.name}</span>
-              <button
-                onClick={() => handleDelete(cal.id)}
-                className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all ml-1"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
+      {/* Pay period navigator */}
+      <div className="bg-white border border-sand-200 rounded-2xl px-5 py-3 flex items-center justify-between">
+        <button
+          onClick={() => setPeriodOffset(o => o - 1)}
+          className="p-1.5 rounded-lg hover:bg-sand-100 transition-colors text-sand-400 hover:text-sand-700"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-sand-800">
+            {periodStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {periodEnd.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
+          <p className="text-xs text-sand-400">
+            {periodOffset === 0 ? 'Current pay period' : periodOffset === -1 ? 'Previous pay period' : `${Math.abs(periodOffset)} periods ago`}
+          </p>
         </div>
-      )}
+        <button
+          onClick={() => setPeriodOffset(o => Math.min(o + 1, 0))}
+          disabled={periodOffset === 0}
+          className="p-1.5 rounded-lg hover:bg-sand-100 transition-colors text-sand-400 hover:text-sand-700 disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
 
-      {/* Calendar embed */}
-      {calendars.length === 0 ? (
-        <div className="text-center py-20">
-          <Calendar className="w-10 h-10 text-sand-300 mx-auto mb-3" />
-          <p className="text-sand-400 text-sm font-medium">No calendars connected yet</p>
-          <p className="text-sand-400 text-xs mt-1">Add a coach's calendar above to see their schedule here</p>
+      {coaches.length === 0 ? (
+        <div className="text-center py-16">
+          <Users className="w-10 h-10 text-sand-300 mx-auto mb-3" />
+          <p className="text-sand-400 text-sm font-medium">No coaches added yet</p>
+          <p className="text-sand-400 text-xs mt-1">Add a coach above to start tracking their hours</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {/* Controls */}
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex bg-white border border-sand-200 rounded-xl p-1 gap-1">
-              {MODES.map(m => (
-                <button
-                  key={m.value}
-                  onClick={() => setMode(m.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    mode === m.value
-                      ? 'bg-blush-500 text-white shadow-sm'
-                      : 'text-sand-500 hover:text-sand-700 hover:bg-sand-50'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setEmbedKey(k => k + 1)}
-                className="flex items-center gap-1.5 text-xs font-medium text-sand-500 hover:text-sand-700 bg-white border border-sand-200 px-3 py-2 rounded-xl transition-colors"
-                title="Refresh calendars"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Refresh
-              </button>
-              <a
-                href={embedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs font-medium text-blush-500 hover:text-blush-600 bg-white border border-sand-200 px-3 py-2 rounded-xl transition-colors"
-              >
-                Open in Google <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </div>
+        <>
+          {/* Grid — scrollable on mobile */}
+          {[{ label: 'Week 1', weekDays: week1 }, { label: 'Week 2', weekDays: week2 }].map(({ label, weekDays }) => (
+            <div key={label} className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-sand-100 flex items-center justify-between">
+                <p className="text-xs font-bold text-blush-500 uppercase tracking-widest">{label}</p>
+                <p className="text-xs text-sand-400">
+                  {weekDays[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {weekDays[4].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                </p>
+              </div>
 
-          <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden shadow-sm">
-            <iframe
-              key={`${embedKey}-${mode}`}
-              src={`${embedUrl}&mode=${mode}`}
-              style={{ border: 0 }}
-              width="100%"
-              height="700"
-              frameBorder="0"
-              scrolling="no"
-              title="Coaches Calendars"
-            />
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-sand-100">
+                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-sand-500 w-36">Coach</th>
+                      {weekDays.map(d => {
+                        const iso = localISO(d)
+                        const isToday = iso === TODAY
+                        return (
+                          <th key={iso} className={`px-1 py-2.5 text-center text-xs font-semibold w-16 ${isToday ? 'text-blush-500' : 'text-sand-500'}`}>
+                            <div>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</div>
+                            <div className={`text-[10px] font-normal ${isToday ? 'text-blush-400' : 'text-sand-400'}`}>
+                              {d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                            </div>
+                          </th>
+                        )
+                      })}
+                      <th className="px-3 py-2.5 text-center text-xs font-semibold text-sand-500 w-16">Week</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coaches.map((coach, i) => {
+                      const weekTotal = coachWeekTotal(coach.name, weekDays)
+                      return (
+                        <tr key={coach.id} className={`border-b border-sand-50 last:border-0 ${i % 2 === 0 ? '' : 'bg-sand-50/50'}`}>
+                          {/* Coach name */}
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-2 group">
+                              <div
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                                style={{ backgroundColor: coach.color || '#e5a0a0' }}
+                              >
+                                {coach.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-sm font-medium text-sand-800 truncate max-w-[80px]">{coach.name}</span>
+                              <button
+                                onClick={() => handleDeleteCoach(coach.id)}
+                                className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all ml-auto"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* Hour cells */}
+                          {weekDays.map(d => {
+                            const iso = localISO(d)
+                            return (
+                              <HourCell
+                                key={iso}
+                                coachName={coach.name}
+                                dateISO={iso}
+                                value={getHours(coach.name, iso)}
+                                onChange={handleCellChange}
+                              />
+                            )
+                          })}
+
+                          {/* Week total */}
+                          <td className="px-3 py-2 text-center">
+                            <span className={`text-sm font-bold ${weekTotal > 0 ? 'text-blush-600' : 'text-sand-300'}`}>
+                              {fmt(weekTotal)}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+
+                    {/* Day totals row */}
+                    <tr className="bg-sand-50 border-t-2 border-sand-200">
+                      <td className="px-4 py-2 text-xs font-bold text-sand-500 uppercase tracking-wide">Total</td>
+                      {weekDays.map(d => {
+                        const iso = localISO(d)
+                        const total = dayTotal(iso)
+                        return (
+                          <td key={iso} className="px-1 py-2 text-center">
+                            <span className={`text-xs font-bold ${total > 0 ? 'text-sand-700' : 'text-sand-300'}`}>
+                              {fmt(total)}
+                            </span>
+                          </td>
+                        )
+                      })}
+                      <td className="px-3 py-2 text-center">
+                        <span className="text-xs font-bold text-sand-700">
+                          {fmt(weekDays.reduce((s, d) => s + dayTotal(localISO(d)), 0))}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+
+          {/* Pay period summary */}
+          <div className="bg-gradient-to-br from-blush-500 to-warm-500 rounded-2xl p-5 text-white">
+            <h3 className="font-semibold mb-3">Pay Period Summary</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className="bg-white/20 rounded-xl p-3">
+                <p className="text-xs opacity-70">Total Hours</p>
+                <p className="text-2xl font-bold">{fmt(grandTotal())}</p>
+              </div>
+              <div className="bg-white/20 rounded-xl p-3">
+                <p className="text-xs opacity-70">Coaches</p>
+                <p className="text-2xl font-bold">{coaches.length}</p>
+              </div>
+              <div className="bg-white/20 rounded-xl p-3">
+                <p className="text-xs opacity-70">Week 1</p>
+                <p className="text-2xl font-bold">{fmt(coaches.reduce((s, c) => s + coachWeekTotal(c.name, week1), 0))}</p>
+              </div>
+              <div className="bg-white/20 rounded-xl p-3">
+                <p className="text-xs opacity-70">Week 2</p>
+                <p className="text-2xl font-bold">{fmt(coaches.reduce((s, c) => s + coachWeekTotal(c.name, week2), 0))}</p>
+              </div>
+            </div>
+
+            {/* Per-coach breakdown */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {coaches.map(coach => {
+                const total = coachTotal(coach.name)
+                return (
+                  <div key={coach.id} className="bg-white/15 rounded-xl px-3 py-2 flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold text-white"
+                      style={{ backgroundColor: coach.color || '#e5a0a0', filter: 'brightness(1.3)' }}>
+                      {coach.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-xs flex-1 truncate opacity-90">{coach.name}</span>
+                    <span className="text-sm font-bold">{fmt(total)}<span className="text-[10px] font-normal opacity-70 ml-0.5">h</span></span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   )

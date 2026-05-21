@@ -16,7 +16,7 @@ const BOSS_LINKS = [
   { to: '/stacey.pm/tasks',             icon: CheckSquare,     label: 'Tasks'            },
   { to: '/stacey.pm/calendar',          icon: Calendar,        label: 'Calendar'         },
   { to: '/stacey.pm/meetings',          icon: CalendarDays,    label: 'Meetings'         },
-  { to: '/stacey.pm/coaches-calendar',  icon: CalendarRange,   label: 'Coaches Cal'      },
+  { to: '/stacey.pm/coaches-calendar',  icon: CalendarRange,   label: 'Coach Hours'      },
   { to: '/stacey.pm/ideas',             icon: Lightbulb,       label: 'Ideas'            },
   { to: '/stacey.pm/dump',              icon: Brain,           label: 'Brain Dump'       },
   { to: '/stacey.pm/team-hours',        icon: Users,           label: 'Team Hours'       },

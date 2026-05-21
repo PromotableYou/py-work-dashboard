@@ -263,20 +263,36 @@ export async function upsertTeamHourRow(row) {
   return data
 }
 
-// ─── CALENDARS (coaches) ──────────────────────────────────────────────────────
-export async function getCalendars() {
+// ─── COACHES ─────────────────────────────────────────────────────────────────
+export async function getCoaches() {
   const { data, error } = await supabase
-    .from('wd_calendars').select('*').order('created_at', { ascending: true })
+    .from('wd_coaches').select('*').order('created_at', { ascending: true })
   if (error) throw error
   return data
 }
-export async function addCalendar(cal) {
+export async function addCoach(coach) {
   const { data, error } = await supabase
-    .from('wd_calendars').insert([cal]).select().single()
+    .from('wd_coaches').insert([coach]).select().single()
   if (error) throw error
   return data
 }
-export async function deleteCalendar(id) {
-  const { error } = await supabase.from('wd_calendars').delete().eq('id', id)
+export async function deleteCoach(id) {
+  const { error } = await supabase.from('wd_coaches').delete().eq('id', id)
   if (error) throw error
+}
+
+// ─── COACH HOURS ──────────────────────────────────────────────────────────────
+export async function getCoachHours() {
+  const { data, error } = await supabase
+    .from('wd_coach_hours').select('*').order('date', { ascending: true })
+  if (error) throw error
+  return data
+}
+export async function upsertCoachHourRow(row) {
+  const { data, error } = await supabase
+    .from('wd_coach_hours')
+    .upsert([row], { onConflict: 'coach_name,date' })
+    .select().single()
+  if (error) throw error
+  return data
 }
