@@ -221,44 +221,6 @@ export default function BossDashboardPage() {
         </div>
       </div>
 
-      {/* Team Hours Overview */}
-      {teamMembers.length > 0 && (
-        <div className="bg-white border border-sand-200 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-sand-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-purple-400" /> Team Hours This Pay Period
-            </h2>
-            <a href="/stacey/team-hours" className="text-xs text-blush-500 hover:text-blush-600 font-medium">Manage →</a>
-          </div>
-          <p className="text-xs text-sand-400 mb-3">
-            {payStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {payEnd.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {teamMembers.map(member => {
-              const hours = memberHours[member.name] || 0
-              const pct   = Math.round((hours / (STD_HOURS * 10)) * 100)
-              return (
-                <div key={member.id} className="bg-sand-50 rounded-xl p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                      style={{ backgroundColor: member.color || '#e5a0a0' }}>
-                      {member.name.charAt(0).toUpperCase()}
-                    </div>
-                    <p className="text-xs font-semibold text-sand-800 truncate">{member.name}</p>
-                  </div>
-                  <p className="text-xl font-bold text-sand-900">
-                    {hours % 1 === 0 ? hours : hours.toFixed(1)}
-                    <span className="text-xs font-normal text-sand-400 ml-1">hrs</span>
-                  </p>
-                  <div className="mt-1.5 h-1 bg-sand-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-blush-400 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
