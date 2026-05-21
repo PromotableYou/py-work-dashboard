@@ -1,20 +1,13 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Users, ChevronLeft, ChevronRight, Check, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import { getTeamMembers, addTeamMember, deleteTeamMember, getTeamHours, upsertTeamHourRow } from '../../../lib/supabase'
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function localISO(date = new Date()) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
-}
-
-// Returns the start of a fortnightly pay period
-function getPayPeriodStart(date = new Date(), anchor = new Date('2025-01-06')) {
-  const diff = Math.floor((date - anchor) / (1000 * 60 * 60 * 24 * 14))
-  const start = new Date(anchor)
-  start.setDate(anchor.getDate() + diff * 14)
-  return start
 }
 
 function addDays(date, n) {
@@ -23,7 +16,13 @@ function addDays(date, n) {
   return d
 }
 
-// Generate the 10 weekdays in a fortnight
+function getPayPeriodStart(date = new Date(), anchor = new Date('2025-01-06')) {
+  const diff = Math.floor((date - anchor) / (1000 * 60 * 60 * 24 * 14))
+  const start = new Date(anchor)
+  start.setDate(anchor.getDate() + diff * 14)
+  return start
+}
+
 function getFortnightDays(start) {
   const days = []
   let current = new Date(start)
@@ -35,103 +34,129 @@ function getFortnightDays(start) {
   return days
 }
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-
 const MEMBER_COLORS = [
   '#e5a0a0', '#f5c27a', '#a0c4e5', '#a0e5b0', '#c4a0e5',
-  '#e5c4a0', '#a0e5e5', '#e5a0c4', '#b0c4a0', '#d4a0d4',
+  '#e5c4a0', '#a0e5e5', '#e5a0c4', '#b0d4a0', '#d4a0d4',
 ]
 
-const WORK_TYPES = ['Normal', 'Annual Leave', 'Sick Leave', 'Public Holiday', 'RDO']
+const LEAVE_TYPES = ['Normal', 'Annual Leave', 'Sick Leave', 'Public Holiday', 'RDO', 'Unpaid']
 
-// ─── Day cell ─────────────────────────────────────────────────────────────────
-function DayCell({ personName, dateISO, data, onChange }) {
-  const [open, setOpen] = useState(false)
-  const worked = data?.worked || false
-  const type = data?.type || 'Normal'
-  const isToday = dateISO === localISO()
+const LEAVE_STYLE = {
+  'Annual Leave':   'bg-blue-100 text-blue-600 border-blue-200',
+  'Sick Leave':     'bg-amber-100 text-amber-600 border-amber-200',
+  'Public Holiday': 'bg-purple-100 text-purple-600 border-purple-200',
+  'RDO':            'bg-emerald-100 text-emerald-600 border-emerald-200',
+  'Unpaid':         'bg-sand-100 text-sand-500 border-sand-200',
+}
 
-  async function toggle() {
-    await onChange(personName, dateISO, { worked: !worked, type, notes: data?.notes || '' })
+const TODAY = localISO()
+
+// ─── Hour input cell ──────────────────────────────────────────────────────────
+function HourCell({ memberName, dateISO, value, leaveType, onChange }) {
+  const [localVal, setLocalVal] = useState(value === 0 ? '' : String(value))
+  const [showType, setShowType] = useState(false)
+  const isToday = dateISO === TODAY
+  const isLeave = leaveType && leaveType !== 'Normal'
+
+  useEffect(() => {
+    setLocalVal(value === 0 ? '' : String(value))
+  }, [value, dateISO])
+
+  function handleChange(e) {
+    const raw = e.target.value
+    if (raw === '' || /^\d*\.?\d?$/.test(raw)) setLocalVal(raw)
   }
 
-  async function changeType(newType) {
-    await onChange(personName, dateISO, { worked: true, type: newType, notes: data?.notes || '' })
-    setOpen(false)
+  function handleBlur() {
+    const num = parseFloat(localVal) || 0
+    setLocalVal(num === 0 ? '' : String(num))
+    if (num !== value) onChange(memberName, dateISO, { hours: num, worked: num > 0, type: leaveType || 'Normal' })
   }
 
-  const cellColor = worked
-    ? type === 'Annual Leave' ? 'bg-blue-100 border-blue-300'
-      : type === 'Sick Leave' ? 'bg-amber-100 border-amber-300'
-      : type === 'Public Holiday' ? 'bg-purple-100 border-purple-300'
-      : type === 'RDO' ? 'bg-emerald-100 border-emerald-300'
-      : 'bg-blush-100 border-blush-300'
-    : 'bg-white border-sand-200 hover:border-sand-300'
+  function handleTypeChange(type) {
+    setShowType(false)
+    // If marking as leave, default to 7.6h if currently 0
+    const hrs = value > 0 ? value : (type !== 'Normal' ? 7.6 : 0)
+    setLocalVal(hrs === 0 ? '' : String(hrs))
+    onChange(memberName, dateISO, { hours: hrs, worked: hrs > 0 || type !== 'Normal', type })
+  }
 
   return (
-    <div className="relative">
-      <button
-        onClick={toggle}
-        onContextMenu={e => { e.preventDefault(); setOpen(o => !o) }}
-        title={`${worked ? '✓ ' + type : 'Not worked'} — right-click to change type`}
-        className={`w-full aspect-square rounded-lg border-2 flex items-center justify-center transition-all text-[10px] font-bold relative ${cellColor} ${
-          isToday ? 'ring-2 ring-offset-1 ring-warm-400' : ''
-        }`}
-      >
-        {worked && (
-          type === 'Normal' ? <Check className="w-3 h-3 text-blush-500" />
-          : type === 'Annual Leave' ? <span className="text-blue-500">AL</span>
-          : type === 'Sick Leave' ? <span className="text-amber-500">SL</span>
-          : type === 'Public Holiday' ? <span className="text-purple-500">PH</span>
-          : type === 'RDO' ? <span className="text-emerald-500">R</span>
-          : <Check className="w-3 h-3 text-blush-500" />
-        )}
-      </button>
+    <td className={`px-1 py-1.5 text-center relative ${isToday ? 'bg-blush-50' : ''}`}>
+      <div className="flex flex-col items-center gap-0.5">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={localVal}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+          placeholder="–"
+          className={`w-11 text-center text-sm rounded-lg border py-1 focus:outline-none focus:ring-2 focus:ring-blush-300 transition-colors ${
+            isLeave
+              ? `${LEAVE_STYLE[leaveType]} font-semibold`
+              : parseFloat(localVal) > 0
+              ? 'bg-blush-50 border-blush-200 text-blush-700 font-semibold'
+              : 'bg-white border-sand-200 text-sand-300 placeholder-sand-200'
+          } ${isToday ? 'ring-1 ring-warm-300' : ''}`}
+        />
+        {/* Leave type badge — click to change */}
+        <button
+          onClick={() => setShowType(s => !s)}
+          className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full border leading-tight transition-colors ${
+            isLeave ? LEAVE_STYLE[leaveType] : 'text-sand-300 border-sand-100 hover:border-sand-300 hover:text-sand-500'
+          }`}
+        >
+          {isLeave ? leaveType.split(' ')[0] : 'type'}
+        </button>
+      </div>
 
-      {open && (
-        <div className="absolute z-20 top-full left-0 mt-1 bg-white border border-sand-200 rounded-xl shadow-lg py-1 min-w-[130px]">
-          {WORK_TYPES.map(t => (
+      {/* Type dropdown */}
+      {showType && (
+        <div className="absolute z-20 top-full left-1/2 -translate-x-1/2 mt-1 bg-white border border-sand-200 rounded-xl shadow-lg py-1 min-w-[120px]">
+          {LEAVE_TYPES.map(t => (
             <button
               key={t}
-              onClick={() => changeType(t)}
-              className={`w-full text-left text-xs px-3 py-1.5 hover:bg-sand-50 transition-colors ${type === t ? 'text-blush-600 font-semibold' : 'text-sand-700'}`}
+              onClick={() => handleTypeChange(t)}
+              className={`w-full text-left text-xs px-3 py-1.5 hover:bg-sand-50 transition-colors ${(leaveType || 'Normal') === t ? 'text-blush-600 font-semibold' : 'text-sand-700'}`}
             >
               {t}
             </button>
           ))}
-          <div className="border-t border-sand-100 mt-1 pt-1">
-            <button
-              onClick={async () => { await onChange(personName, dateISO, { worked: false, type: 'Normal', notes: '' }); setOpen(false) }}
-              className="w-full text-left text-xs px-3 py-1.5 text-red-400 hover:bg-red-50 transition-colors"
-            >
-              Clear
-            </button>
-          </div>
+          {(value > 0 || isLeave) && (
+            <>
+              <div className="border-t border-sand-100 my-1" />
+              <button
+                onClick={() => { setShowType(false); setLocalVal(''); onChange(memberName, dateISO, { hours: 0, worked: false, type: 'Normal' }) }}
+                className="w-full text-left text-xs px-3 py-1.5 text-red-400 hover:bg-red-50"
+              >
+                Clear
+              </button>
+            </>
+          )}
         </div>
       )}
-    </div>
+    </td>
   )
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function TeamHoursPage() {
   const [members, setMembers] = useState([])
-  const [hoursData, setHoursData] = useState([]) // raw rows from DB
+  const [hoursData, setHoursData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [newName, setNewName] = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
-  const [periodOffset, setPeriodOffset] = useState(0) // 0 = current, -1 = previous, etc.
+  const [periodOffset, setPeriodOffset] = useState(0)
 
-  // Compute pay period based on offset
-  const TODAY = new Date()
-  const baseStart = getPayPeriodStart(TODAY)
+  const TODAY_DATE = new Date()
+  const baseStart = getPayPeriodStart(TODAY_DATE)
   const periodStart = addDays(baseStart, periodOffset * 14)
   const periodEnd = addDays(periodStart, 13)
   const days = getFortnightDays(periodStart)
-
-  const periodStartISO = localISO(periodStart)
-  const periodEndISO = localISO(periodEnd)
+  const week1 = days.slice(0, 5)
+  const week2 = days.slice(5, 10)
 
   useEffect(() => {
     Promise.all([getTeamMembers(), getTeamHours()])
@@ -140,29 +165,24 @@ export default function TeamHoursPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  // Build lookup: { "name|date": rowObj }
-  const hoursLookup = {}
-  hoursData.forEach(row => {
-    hoursLookup[`${row.person_name}|${row.date}`] = row
-  })
+  // Lookup: "name|date" → row
+  const lookup = {}
+  hoursData.forEach(r => { lookup[`${r.person_name}|${r.date}`] = r })
 
-  // Filter hours for current period
-  const periodHours = hoursData.filter(h => h.date >= periodStartISO && h.date <= periodEndISO)
+  const getRow = (name, dateISO) => lookup[`${name}|${dateISO}`] || { hours: 0, worked: false, type: 'Normal' }
+  const getHours = (name, dateISO) => parseFloat(getRow(name, dateISO).hours) || 0
+  const getType = (name, dateISO) => getRow(name, dateISO).type || 'Normal'
 
-  async function handleCellChange(personName, dateISO, fields) {
+  const handleCellChange = useCallback(async (memberName, dateISO, fields) => {
     try {
-      const saved = await upsertTeamHourRow({ person_name: personName, date: dateISO, ...fields })
+      const saved = await upsertTeamHourRow({ person_name: memberName, date: dateISO, ...fields })
       setHoursData(prev => {
-        const existing = prev.findIndex(r => r.person_name === personName && r.date === dateISO)
-        if (existing >= 0) {
-          const next = [...prev]
-          next[existing] = saved
-          return next
-        }
+        const idx = prev.findIndex(r => r.person_name === memberName && r.date === dateISO)
+        if (idx >= 0) { const next = [...prev]; next[idx] = saved; return next }
         return [...prev, saved]
       })
     } catch (e) { setError(e.message) }
-  }
+  }, [])
 
   async function handleAddMember(e) {
     e.preventDefault()
@@ -182,12 +202,21 @@ export default function TeamHoursPage() {
     catch (e) { setError(e.message) }
   }
 
-  // Summary per member for this period
-  function memberSummary(memberName) {
-    const rows = periodHours.filter(h => h.person_name === memberName && h.worked)
+  // Totals
+  const memberTotal = (name) => days.reduce((s, d) => s + getHours(name, localISO(d)), 0)
+  const memberWeekTotal = (name, wkDays) => wkDays.reduce((s, d) => s + getHours(name, localISO(d)), 0)
+  const dayTotal = (iso) => members.reduce((s, m) => s + getHours(m.name, iso), 0)
+  const grandTotal = () => members.reduce((s, m) => s + memberTotal(m.name), 0)
+  const fmt = (n) => n === 0 ? '–' : n % 1 === 0 ? String(n) : n.toFixed(1)
+
+  // Leave summary per member
+  function leaveSummary(name) {
+    const periodStartISO = localISO(periodStart)
+    const periodEndISO = localISO(periodEnd)
+    const rows = hoursData.filter(r => r.person_name === name && r.date >= periodStartISO && r.date <= periodEndISO && r.type && r.type !== 'Normal')
     const byType = {}
-    rows.forEach(r => { byType[r.type || 'Normal'] = (byType[r.type || 'Normal'] || 0) + 1 })
-    return { total: rows.length, byType }
+    rows.forEach(r => { byType[r.type] = (byType[r.type] || 0) + 1 })
+    return byType
   }
 
   if (loading) return (
@@ -199,7 +228,7 @@ export default function TeamHoursPage() {
   return (
     <div className="space-y-5 pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-sand-900">Team Hours</h1>
           <p className="text-sand-400 text-sm mt-0.5">{members.length} team member{members.length !== 1 ? 's' : ''}</p>
@@ -218,7 +247,7 @@ export default function TeamHoursPage() {
         </div>
       )}
 
-      {/* Add member form */}
+      {/* Add member */}
       {showAddMember && (
         <div className="bg-white border border-sand-200 rounded-2xl p-5">
           <form onSubmit={handleAddMember} className="flex gap-3">
@@ -237,10 +266,7 @@ export default function TeamHoursPage() {
 
       {/* Pay period navigator */}
       <div className="bg-white border border-sand-200 rounded-2xl px-5 py-3 flex items-center justify-between">
-        <button
-          onClick={() => setPeriodOffset(o => o - 1)}
-          className="p-1.5 rounded-lg hover:bg-sand-100 transition-colors text-sand-400 hover:text-sand-700"
-        >
+        <button onClick={() => setPeriodOffset(o => o - 1)} className="p-1.5 rounded-lg hover:bg-sand-100 text-sand-400 hover:text-sand-700 transition-colors">
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div className="text-center">
@@ -251,149 +277,160 @@ export default function TeamHoursPage() {
             {periodOffset === 0 ? 'Current pay period' : periodOffset === -1 ? 'Previous pay period' : `${Math.abs(periodOffset)} periods ago`}
           </p>
         </div>
-        <button
-          onClick={() => setPeriodOffset(o => Math.min(o + 1, 0))}
-          disabled={periodOffset === 0}
-          className="p-1.5 rounded-lg hover:bg-sand-100 transition-colors text-sand-400 hover:text-sand-700 disabled:opacity-30 disabled:cursor-not-allowed"
-        >
+        <button onClick={() => setPeriodOffset(o => Math.min(o + 1, 0))} disabled={periodOffset === 0} className="p-1.5 rounded-lg hover:bg-sand-100 text-sand-400 hover:text-sand-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-[10px] font-semibold text-sand-400 uppercase tracking-wide">Legend:</span>
-        {[
-          { label: 'Normal', color: 'bg-blush-100 border-blush-300 text-blush-500' },
-          { label: 'Annual Leave', color: 'bg-blue-100 border-blue-300 text-blue-500' },
-          { label: 'Sick Leave', color: 'bg-amber-100 border-amber-300 text-amber-500' },
-          { label: 'Public Holiday', color: 'bg-purple-100 border-purple-300 text-purple-500' },
-          { label: 'RDO', color: 'bg-emerald-100 border-emerald-300 text-emerald-500' },
-        ].map(({ label, color }) => (
-          <span key={label} className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${color}`}>{label}</span>
-        ))}
-        <span className="text-[10px] text-sand-400">Right-click a cell to change type</span>
-      </div>
+      {/* Hint */}
+      <p className="text-xs text-sand-400">Enter hours per day. Click <span className="font-semibold">type</span> under any cell to mark leave, RDO or public holidays.</p>
 
-      {/* Grid */}
       {members.length === 0 ? (
         <div className="text-center py-16">
           <Users className="w-10 h-10 text-sand-300 mx-auto mb-3" />
           <p className="text-sand-400 text-sm">No team members yet — add someone above</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {members.map(member => {
-            const summary = memberSummary(member.name)
+        <>
+          {[{ label: 'Week 1', weekDays: week1 }, { label: 'Week 2', weekDays: week2 }].map(({ label, weekDays }) => (
+            <div key={label} className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-sand-100 flex items-center justify-between">
+                <p className="text-xs font-bold text-blush-500 uppercase tracking-widest">{label}</p>
+                <p className="text-xs text-sand-400">
+                  {weekDays[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {weekDays[4].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                </p>
+              </div>
 
-            return (
-              <div key={member.id} className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
-                {/* Member header */}
-                <div className="flex items-center justify-between px-5 py-3 border-b border-sand-100">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                      style={{ backgroundColor: member.color || '#e5a0a0' }}
-                    >
-                      {member.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sand-900 text-sm">{member.name}</p>
-                      <p className="text-xs text-sand-400">
-                        {summary.total} day{summary.total !== 1 ? 's' : ''} worked
-                        {Object.entries(summary.byType).filter(([t]) => t !== 'Normal').map(([t, n]) => ` · ${n} ${t}`)}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteMember(member.id)}
-                    className="text-sand-300 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Day grid — 2 rows of 5 */}
-                <div className="px-5 py-4">
-                  {[0, 1].map(week => {
-                    const weekDays = days.slice(week * 5, week * 5 + 5)
-                    const weekStart = weekDays[0]
-                    return (
-                      <div key={week} className="mb-3 last:mb-0">
-                        <p className="text-[10px] font-semibold text-sand-400 mb-2">
-                          Week {week + 1} — {weekStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                        </p>
-                        <div className="grid grid-cols-5 gap-1.5">
-                          {weekDays.map((day, i) => {
-                            const iso = localISO(day)
-                            return (
-                              <div key={iso}>
-                                <p className="text-[9px] text-center text-sand-400 mb-1">{DAY_LABELS[i]}</p>
-                                <DayCell
-                                  personName={member.name}
-                                  dateISO={iso}
-                                  data={hoursLookup[`${member.name}|${iso}`]}
-                                  onChange={handleCellChange}
-                                />
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-sand-100">
+                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-sand-500 w-36">Member</th>
+                      {weekDays.map(d => {
+                        const iso = localISO(d)
+                        const isToday = iso === TODAY
+                        return (
+                          <th key={iso} className={`px-1 py-2.5 text-center text-xs font-semibold w-16 ${isToday ? 'text-blush-500' : 'text-sand-500'}`}>
+                            <div>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</div>
+                            <div className={`text-[10px] font-normal ${isToday ? 'text-blush-400' : 'text-sand-400'}`}>
+                              {d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                            </div>
+                          </th>
+                        )
+                      })}
+                      <th className="px-3 py-2.5 text-center text-xs font-semibold text-sand-500 w-16">Week</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.map((member, i) => {
+                      const weekTotal = memberWeekTotal(member.name, weekDays)
+                      return (
+                        <tr key={member.id} className={`border-b border-sand-50 last:border-0 ${i % 2 === 0 ? '' : 'bg-sand-50/40'}`}>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-2 group">
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                                style={{ backgroundColor: member.color || '#e5a0a0' }}>
+                                {member.name.charAt(0).toUpperCase()}
                               </div>
+                              <span className="text-sm font-medium text-sand-800 truncate max-w-[80px]">{member.name}</span>
+                              <button onClick={() => handleDeleteMember(member.id)}
+                                className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all ml-auto">
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
+                          {weekDays.map(d => {
+                            const iso = localISO(d)
+                            return (
+                              <HourCell
+                                key={iso}
+                                memberName={member.name}
+                                dateISO={iso}
+                                value={getHours(member.name, iso)}
+                                leaveType={getType(member.name, iso)}
+                                onChange={handleCellChange}
+                              />
                             )
                           })}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                          <td className="px-3 py-2 text-center">
+                            <span className={`text-sm font-bold ${weekTotal > 0 ? 'text-blush-600' : 'text-sand-300'}`}>
+                              {fmt(weekTotal)}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
 
-                {/* Mini summary bar */}
-                <div className="bg-sand-50 border-t border-sand-100 px-5 py-2.5 flex gap-4 flex-wrap">
-                  <span className="text-xs text-sand-500">
-                    <span className="font-semibold text-sand-800">{summary.total}</span> / 10 days
-                  </span>
-                  <span className="text-xs text-sand-500">
-                    <span className="font-semibold text-sand-800">{summary.total * 7.6}</span> hrs (@ 7.6hr/day)
-                  </span>
-                  {summary.byType['Annual Leave'] > 0 && (
-                    <span className="text-xs text-blue-500">{summary.byType['Annual Leave']} AL</span>
-                  )}
-                  {summary.byType['Sick Leave'] > 0 && (
-                    <span className="text-xs text-amber-500">{summary.byType['Sick Leave']} SL</span>
-                  )}
-                  {summary.byType['RDO'] > 0 && (
-                    <span className="text-xs text-emerald-500">{summary.byType['RDO']} RDO</span>
-                  )}
-                  {summary.byType['Public Holiday'] > 0 && (
-                    <span className="text-xs text-purple-500">{summary.byType['Public Holiday']} PH</span>
-                  )}
-                </div>
+                    {/* Day totals */}
+                    <tr className="bg-sand-50 border-t-2 border-sand-200">
+                      <td className="px-4 py-2 text-xs font-bold text-sand-500 uppercase tracking-wide">Total</td>
+                      {weekDays.map(d => {
+                        const iso = localISO(d)
+                        const total = dayTotal(iso)
+                        return (
+                          <td key={iso} className="px-1 py-2 text-center">
+                            <span className={`text-xs font-bold ${total > 0 ? 'text-sand-700' : 'text-sand-300'}`}>{fmt(total)}</span>
+                          </td>
+                        )
+                      })}
+                      <td className="px-3 py-2 text-center">
+                        <span className="text-xs font-bold text-sand-700">
+                          {fmt(weekDays.reduce((s, d) => s + dayTotal(localISO(d)), 0))}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            )
-          })}
-        </div>
-      )}
+            </div>
+          ))}
 
-      {/* Pay summary */}
-      {members.length > 0 && (
-        <div className="bg-gradient-to-br from-blush-500 to-warm-500 rounded-2xl p-5 text-white">
-          <h3 className="font-semibold mb-3">Pay Period Summary</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white/20 rounded-xl p-3">
-              <p className="text-xs opacity-70">Team Members</p>
-              <p className="text-2xl font-bold">{members.length}</p>
+          {/* Pay period summary */}
+          <div className="bg-gradient-to-br from-blush-500 to-warm-500 rounded-2xl p-5 text-white">
+            <h3 className="font-semibold mb-3">Pay Period Summary</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className="bg-white/20 rounded-xl p-3">
+                <p className="text-xs opacity-70">Total Hours</p>
+                <p className="text-2xl font-bold">{fmt(grandTotal())}</p>
+              </div>
+              <div className="bg-white/20 rounded-xl p-3">
+                <p className="text-xs opacity-70">Team Members</p>
+                <p className="text-2xl font-bold">{members.length}</p>
+              </div>
+              <div className="bg-white/20 rounded-xl p-3">
+                <p className="text-xs opacity-70">Week 1</p>
+                <p className="text-2xl font-bold">{fmt(members.reduce((s, m) => s + memberWeekTotal(m.name, week1), 0))}</p>
+              </div>
+              <div className="bg-white/20 rounded-xl p-3">
+                <p className="text-xs opacity-70">Week 2</p>
+                <p className="text-2xl font-bold">{fmt(members.reduce((s, m) => s + memberWeekTotal(m.name, week2), 0))}</p>
+              </div>
             </div>
-            <div className="bg-white/20 rounded-xl p-3">
-              <p className="text-xs opacity-70">Total Days</p>
-              <p className="text-2xl font-bold">{periodHours.filter(h => h.worked).length}</p>
-            </div>
-            <div className="bg-white/20 rounded-xl p-3">
-              <p className="text-xs opacity-70">Total Hours</p>
-              <p className="text-2xl font-bold">{(periodHours.filter(h => h.worked).length * 7.6).toFixed(0)}</p>
-            </div>
-            <div className="bg-white/20 rounded-xl p-3">
-              <p className="text-xs opacity-70">Leave Days</p>
-              <p className="text-2xl font-bold">{periodHours.filter(h => h.worked && h.type !== 'Normal').length}</p>
+
+            {/* Per-member breakdown */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {members.map(member => {
+                const total = memberTotal(member.name)
+                const leave = leaveSummary(member.name)
+                return (
+                  <div key={member.id} className="bg-white/15 rounded-xl px-3 py-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold text-white"
+                        style={{ backgroundColor: member.color || '#e5a0a0', filter: 'brightness(1.3)' }}>
+                        {member.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-xs flex-1 truncate opacity-90">{member.name}</span>
+                      <span className="text-sm font-bold">{fmt(total)}<span className="text-[10px] font-normal opacity-70 ml-0.5">h</span></span>
+                    </div>
+                    {Object.entries(leave).map(([type, count]) => (
+                      <p key={type} className="text-[10px] opacity-70 ml-7">{count}d {type}</p>
+                    ))}
+                  </div>
+                )
+              })}
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   )
