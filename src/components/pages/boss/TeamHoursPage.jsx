@@ -178,7 +178,13 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
   async function handleApprove(log, coachName) {
     try {
       setApproveError(null)
-      await approveCoachLog(log.id, { person_name: coachName, date: log.date, hours: log.hours })
+      await approveCoachLog(log.id, {
+        person_name: coachName,
+        date: log.date,
+        hours: log.hours,
+        coaching_hours: log.coaching_hours,
+        admin_hours: log.admin_hours,
+      })
       setLogs(prev => prev.map(l => l.id === log.id ? { ...l, approved: true } : l))
       onApproved?.()  // refresh team members + hours in parent
     } catch (e) {
@@ -230,7 +236,9 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
       <div className="space-y-3">
         {COACHES.map(coach => {
             const coachPeriodLogs = periodLogs.filter(l => l.coach_name === coach.name)
-            const totalHours = coachPeriodLogs.reduce((s, l) => s + (parseFloat(l.hours) || 0), 0)
+            const totalCoachingHours = coachPeriodLogs.reduce((s, l) => s + (parseFloat(l.coaching_hours) || 0), 0)
+            const totalAdminHours    = coachPeriodLogs.reduce((s, l) => s + (parseFloat(l.admin_hours)    || 0), 0)
+            const totalHours = totalCoachingHours + totalAdminHours || coachPeriodLogs.reduce((s, l) => s + (parseFloat(l.hours) || 0), 0)
             const allSessions = [...new Set(coachPeriodLogs.flatMap(l => l.sessions || []))]
             const allClients = coachPeriodLogs.flatMap(l => (l.private_sessions || []).filter(p => p.client))
             const isExpanded = expandedCoach === coach.slug
@@ -249,11 +257,33 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
                     <p className="font-semibold text-sand-900">{coach.name}</p>
                     <p className="text-xs text-sand-400">
                       {coach.email}
-                      {coachPeriodLogs.length > 0 && ` · ${coachPeriodLogs.length} log${coachPeriodLogs.length !== 1 ? 's' : ''} · ${totalHours.toFixed(1)}h`}
+                      {coachPeriodLogs.length > 0 && ` · ${coachPeriodLogs.length} log${coachPeriodLogs.length !== 1 ? 's' : ''}`}
                     </p>
                   </div>
                   {totalHours > 0 && (
-                    <span className="text-lg font-bold text-blush-500 mr-2">{totalHours.toFixed(1)}<span className="text-xs font-normal text-sand-400 ml-0.5">h</span></span>
+                    <div className="flex items-center gap-3 mr-2">
+                      {totalCoachingHours > 0 && (
+                        <div className="text-right">
+                          <p className="text-[10px] font-semibold text-blush-400 uppercase tracking-wide leading-none">Coaching</p>
+                          <p className="text-base font-bold text-blush-500">{totalCoachingHours.toFixed(1)}<span className="text-xs font-normal text-sand-400 ml-0.5">h</span></p>
+                        </div>
+                      )}
+                      {totalAdminHours > 0 && (
+                        <div className="text-right">
+                          <p className="text-[10px] font-semibold text-sand-400 uppercase tracking-wide leading-none">Admin</p>
+                          <p className="text-base font-bold text-sand-600">{totalAdminHours.toFixed(1)}<span className="text-xs font-normal text-sand-400 ml-0.5">h</span></p>
+                        </div>
+                      )}
+                      {(totalCoachingHours > 0 || totalAdminHours > 0) && (
+                        <div className="text-right">
+                          <p className="text-[10px] font-semibold text-sand-400 uppercase tracking-wide leading-none">Total</p>
+                          <p className="text-base font-bold text-sand-800">{totalHours.toFixed(1)}<span className="text-xs font-normal text-sand-400 ml-0.5">h</span></p>
+                        </div>
+                      )}
+                      {!totalCoachingHours && !totalAdminHours && (
+                        <span className="text-lg font-bold text-blush-500">{totalHours.toFixed(1)}<span className="text-xs font-normal text-sand-400 ml-0.5">h</span></span>
+                      )}
+                    </div>
                   )}
                   <button
                     onClick={e => { e.stopPropagation(); copyLink(coach.slug) }}
@@ -328,8 +358,16 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
                                   </p>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-0.5">
-                                    <span className="text-sm font-bold text-blush-500">{log.hours}h</span>
+                                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                    {log.coaching_hours > 0 && (
+                                      <span className="text-sm font-bold text-blush-500">{log.coaching_hours}h coaching</span>
+                                    )}
+                                    {log.admin_hours > 0 && (
+                                      <span className="text-sm font-bold text-sand-500">{log.admin_hours}h admin</span>
+                                    )}
+                                    {!log.coaching_hours && !log.admin_hours && log.hours > 0 && (
+                                      <span className="text-sm font-bold text-blush-500">{log.hours}h</span>
+                                    )}
                                     {log.approved && <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">✓ approved</span>}
                                     {log.sessions?.length > 0 && (
                                       <span className="text-xs text-sand-500 truncate">{log.sessions.join(', ')}</span>

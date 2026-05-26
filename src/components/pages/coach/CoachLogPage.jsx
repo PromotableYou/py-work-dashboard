@@ -25,7 +25,7 @@ function formatWeek(monday) {
   return `${monday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${fri.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 }
 function emptyDay() {
-  return { hours: '', sessions: [], clients: [], notes: '' }
+  return { coaching_hours: '', admin_hours: '', sessions: [], clients: [], notes: '' }
 }
 
 export default function CoachLogPage() {
@@ -74,8 +74,11 @@ export default function CoachLogPage() {
     weekLogs.forEach(log => {
       const day = DAY_KEYS.find(d => dayISO(d) === log.date)
       if (day) {
+        // If log has split hours use them; otherwise try to recover total into coaching slot
+        const hasCoachingHours = log.coaching_hours != null
         newData[day] = {
-          hours: String(log.hours || ''),
+          coaching_hours: hasCoachingHours ? String(log.coaching_hours || '') : String(log.hours || ''),
+          admin_hours:    hasCoachingHours ? String(log.admin_hours    || '') : '',
           sessions: log.sessions || [],
           clients: log.private_sessions?.length ? log.private_sessions : [],
           notes: log.notes || '',
@@ -131,13 +134,17 @@ export default function CoachLogPage() {
     try {
       for (const day of DAY_KEYS) {
         const d = dayData[day]
-        const hasAnything = d.hours || d.sessions.length > 0 || d.clients.some(c => c.client.trim()) || d.notes.trim()
+        const coachingH = parseFloat(d.coaching_hours) || 0
+        const adminH    = parseFloat(d.admin_hours) || 0
+        const hasAnything = coachingH || adminH || d.sessions.length > 0 || d.clients.some(c => c.client.trim()) || d.notes.trim()
         if (!hasAnything) continue
         const iso = dayISO(day)
         const payload = {
           coach_name: displayName,
           date: iso,
-          hours: parseFloat(d.hours) || 0,
+          coaching_hours: coachingH,
+          admin_hours: adminH,
+          hours: coachingH + adminH,   // keep total for backward compat
           sessions: d.sessions,
           private_sessions: d.clients.filter(c => c.client.trim()),
           notes: d.notes.trim(),
@@ -372,21 +379,42 @@ export default function CoachLogPage() {
                     />
                   </div>
 
-                  {/* Hours */}
-                  <div className="mt-auto pt-2.5 border-t border-sand-200">
+                  {/* Hours split */}
+                  <div className="mt-auto pt-2.5 border-t border-sand-200 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-bold text-sand-600 uppercase tracking-wide whitespace-nowrap">Hours worked</label>
+                      <label className="text-[10px] font-bold text-blush-500 uppercase tracking-wide whitespace-nowrap flex-1">Coaching hrs</label>
                       <input
                         type="number"
                         step="0.5"
                         min="0"
                         max="24"
-                        value={d.hours}
-                        onChange={e => setField(day, 'hours', e.target.value)}
+                        value={d.coaching_hours}
+                        onChange={e => setField(day, 'coaching_hours', e.target.value)}
                         placeholder="0"
                         className="w-16 text-sm font-bold text-sand-900 bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-center placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
                       />
                     </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-bold text-sand-500 uppercase tracking-wide whitespace-nowrap flex-1">Admin hrs</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="24"
+                        value={d.admin_hours}
+                        onChange={e => setField(day, 'admin_hours', e.target.value)}
+                        placeholder="0"
+                        className="w-16 text-sm font-bold text-sand-900 bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-center placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
+                      />
+                    </div>
+                    {(parseFloat(d.coaching_hours) > 0 || parseFloat(d.admin_hours) > 0) && (
+                      <div className="flex items-center justify-between pt-1 border-t border-sand-100">
+                        <span className="text-[10px] text-sand-400 font-semibold uppercase tracking-wide">Total</span>
+                        <span className="text-sm font-bold text-sand-900">
+                          {((parseFloat(d.coaching_hours) || 0) + (parseFloat(d.admin_hours) || 0)).toFixed(1)}h
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                 </div>
@@ -396,13 +424,29 @@ export default function CoachLogPage() {
         </div>
 
         {/* Weekly total */}
-        {DAY_KEYS.some(d => dayData[d].hours) && (
+        {DAY_KEYS.some(d => dayData[d].coaching_hours || dayData[d].admin_hours) && (
           <div className="mt-4 flex justify-end">
-            <div className="bg-white border border-sand-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
-              <span className="text-xs text-sand-400 font-semibold uppercase tracking-wide">Week total</span>
-              <span className="text-lg font-bold text-blush-500">
-                {DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].hours) || 0), 0).toFixed(1)}h
-              </span>
+            <div className="bg-white border border-sand-200 rounded-xl px-5 py-3 flex items-center gap-5">
+              <div className="text-center">
+                <p className="text-[10px] font-bold text-blush-400 uppercase tracking-wide">Coaching</p>
+                <p className="text-lg font-bold text-blush-500">
+                  {DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].coaching_hours) || 0), 0).toFixed(1)}h
+                </p>
+              </div>
+              <div className="w-px h-8 bg-sand-200" />
+              <div className="text-center">
+                <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Admin</p>
+                <p className="text-lg font-bold text-sand-600">
+                  {DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].admin_hours) || 0), 0).toFixed(1)}h
+                </p>
+              </div>
+              <div className="w-px h-8 bg-sand-200" />
+              <div className="text-center">
+                <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Total</p>
+                <p className="text-lg font-bold text-sand-900">
+                  {DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].coaching_hours) || 0) + (parseFloat(dayData[d].admin_hours) || 0), 0).toFixed(1)}h
+                </p>
+              </div>
             </div>
           </div>
         )}
