@@ -142,11 +142,12 @@ function HourCell({ memberName, dateISO, value, leaveType, onChange }) {
 }
 
 // ─── Coach Logs Tab ───────────────────────────────────────────────────────────
-function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset }) {
+function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, onApproved }) {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [copiedId, setCopiedId] = useState(null)
   const [expandedCoach, setExpandedCoach] = useState(null)
+  const [approveError, setApproveError] = useState(null)
 
   useEffect(() => {
     getAllCoachLogs()
@@ -175,13 +176,24 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset })
   }
 
   async function handleApprove(log, coachName) {
-    await approveCoachLog(log.id, { person_name: coachName, date: log.date, hours: log.hours })
-    setLogs(prev => prev.map(l => l.id === log.id ? { ...l, approved: true } : l))
+    try {
+      setApproveError(null)
+      await approveCoachLog(log.id, { person_name: coachName, date: log.date, hours: log.hours })
+      setLogs(prev => prev.map(l => l.id === log.id ? { ...l, approved: true } : l))
+      onApproved?.()  // refresh team members + hours in parent
+    } catch (e) {
+      setApproveError(e.message)
+    }
   }
 
   async function handleUnapprove(log, coachName) {
-    await unapproveCoachLog(log.id, { person_name: coachName, date: log.date })
-    setLogs(prev => prev.map(l => l.id === log.id ? { ...l, approved: false } : l))
+    try {
+      setApproveError(null)
+      await unapproveCoachLog(log.id, { person_name: coachName, date: log.date })
+      setLogs(prev => prev.map(l => l.id === log.id ? { ...l, approved: false } : l))
+    } catch (e) {
+      setApproveError(e.message)
+    }
   }
 
   if (loading) return (
@@ -192,6 +204,11 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset })
 
   return (
     <div className="space-y-5">
+      {approveError && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {approveError}
+        </div>
+      )}
       {/* Pay period navigator */}
       <div className="bg-white border border-sand-200 rounded-2xl px-5 py-3 flex items-center justify-between">
         <button onClick={() => setPeriodOffset(o => o - 1)} className="p-1.5 rounded-lg hover:bg-sand-100 text-sand-400 hover:text-sand-700 transition-colors">
@@ -562,6 +579,11 @@ export default function TeamHoursPage() {
           periodEnd={periodEnd}
           periodOffset={periodOffset}
           setPeriodOffset={setPeriodOffset}
+          onApproved={() => {
+            // Reload members and hours so Team Hours tab reflects the approval immediately
+            Promise.all([getTeamMembers(), getTeamHours()])
+              .then(([m, h]) => { setMembers(m); setHoursData(h) })
+          }}
         />
       )}
 

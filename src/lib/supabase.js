@@ -414,6 +414,21 @@ export async function approveCoachLog(logId, { person_name, date, hours }) {
     .update({ approved: true, approved_at: new Date().toISOString() })
     .eq('id', logId)
   if (e1) throw e1
+
+  // Ensure the coach exists in wd_team_members so they show as a row in the grid
+  const { data: existing } = await supabase
+    .from('wd_team_members')
+    .select('id')
+    .eq('name', person_name)
+    .maybeSingle()
+  if (!existing) {
+    const colors = ['#f9a8d4','#fca5a5','#fdba74','#a5b4fc','#86efac','#7dd3fc']
+    await supabase.from('wd_team_members').insert([{
+      name: person_name,
+      color: colors[Math.floor(Math.random() * colors.length)],
+    }])
+  }
+
   // Write hours into team hours grid
   const { error: e2 } = await supabase
     .from('wd_team_hours')
