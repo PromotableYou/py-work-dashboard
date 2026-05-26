@@ -25,7 +25,7 @@ function formatWeek(monday) {
   return `${monday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${fri.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 }
 function emptyDay() {
-  return { hours: '', sessions: [], clients: [] }
+  return { hours: '', sessions: [], clients: [], notes: '' }
 }
 
 export default function CoachLogPage() {
@@ -78,6 +78,7 @@ export default function CoachLogPage() {
           hours: String(log.hours || ''),
           sessions: log.sessions || [],
           clients: log.private_sessions?.length ? log.private_sessions : [],
+          notes: log.notes || '',
         }
       }
     })
@@ -130,7 +131,7 @@ export default function CoachLogPage() {
     try {
       for (const day of DAY_KEYS) {
         const d = dayData[day]
-        const hasAnything = d.hours || d.sessions.length > 0 || d.clients.some(c => c.client.trim())
+        const hasAnything = d.hours || d.sessions.length > 0 || d.clients.some(c => c.client.trim()) || d.notes.trim()
         if (!hasAnything) continue
         const iso = dayISO(day)
         const payload = {
@@ -139,7 +140,7 @@ export default function CoachLogPage() {
           hours: parseFloat(d.hours) || 0,
           sessions: d.sessions,
           private_sessions: d.clients.filter(c => c.client.trim()),
-          notes: '',
+          notes: d.notes.trim(),
         }
         // Update if a log already exists for this day, otherwise insert
         const existing = recentLogs.find(l => l.date === iso && l.coach_name === displayName)
@@ -351,6 +352,18 @@ export default function CoachLogPage() {
                         ))}
                       </div>
                     )}
+                  </div>
+
+                  {/* Other work / notes */}
+                  <div>
+                    <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide mb-1.5">Other work</p>
+                    <textarea
+                      value={d.notes}
+                      onChange={e => setField(day, 'notes', e.target.value)}
+                      placeholder="What else did you work on?"
+                      rows={2}
+                      className="w-full text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none resize-none"
+                    />
                   </div>
 
                   {/* Hours */}

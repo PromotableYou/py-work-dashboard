@@ -298,7 +298,11 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset })
                                       1:1: {log.private_sessions.filter(p => p.client).map(p => `${p.client}${p.duration ? ` (${p.duration})` : ''}`).join(', ')}
                                     </p>
                                   )}
-                                  {log.notes && <p className="text-xs text-sand-400 italic mt-0.5">"{log.notes}"</p>}
+                                  {log.notes && (
+                                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 mt-1">
+                                      📝 {log.notes}
+                                    </p>
+                                  )}
                                 </div>
                                 <button
                                   onClick={() => handleDeleteLog(log.id)}
