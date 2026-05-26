@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, Trash2, CheckCircle } from 'lucide-react'
-import { getSessionTypes, addCoachLog, getCoachLogs } from '../../../lib/supabase'
+import { ChevronLeft, ChevronRight, Plus, Trash2, CheckCircle, CalendarDays } from 'lucide-react'
+import { getSessionTypes, addCoachLog, getCoachLogs, getRosterBlocks } from '../../../lib/supabase'
 import { coachBySlug } from '../../../lib/coaches'
+
+const DAY_KEYS  = ['mon', 'tue', 'wed', 'thu', 'fri']
+const DAY_LABEL = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri' }
 
 function getWeekStart(date = new Date()) {
   const d = new Date(date)
@@ -39,7 +42,9 @@ export default function CoachLogPage() {
 
   const [sessionTypes, setSessionTypes] = useState([])
   const [recentLogs, setRecentLogs] = useState([])
+  const [rosterBlocks, setRosterBlocks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [rosterLoading, setRosterLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState(null)
@@ -54,7 +59,9 @@ export default function CoachLogPage() {
   const [selectedSessions, setSelectedSessions] = useState([])
   const [privateClients, setPrivateClients] = useState([{ client: '', duration: '' }])
   const [notes, setNotes] = useState('')
+  const [prefilledFromRoster, setPrefilledFromRoster] = useState(false)
 
+  // Initial load
   useEffect(() => {
     if (!displayName) { setLoading(false); return }
     Promise.all([getSessionTypes(), getCoachLogs(displayName)])
@@ -63,20 +70,44 @@ export default function CoachLogPage() {
       .finally(() => setLoading(false))
   }, [displayName])
 
+  // When week changes — load roster for that week + pre-fill form
   useEffect(() => {
-    const existing = recentLogs.find(l => l.date === weekISO)
-    if (existing) {
-      setHours(String(existing.hours || ''))
-      setSelectedSessions(existing.sessions || [])
-      setPrivateClients(existing.private_sessions?.length ? existing.private_sessions : [{ client: '', duration: '' }])
-      setNotes(existing.notes || '')
-    } else {
-      setHours('')
-      setSelectedSessions([])
-      setPrivateClients([{ client: '', duration: '' }])
-      setNotes('')
+    if (!displayName) return
+    const existingLog = recentLogs.find(l => l.date === weekISO)
+
+    if (existingLog) {
+      // Already submitted — fill from their saved log
+      setHours(String(existingLog.hours || ''))
+      setSelectedSessions(existingLog.sessions || [])
+      setPrivateClients(existingLog.private_sessions?.length ? existingLog.private_sessions : [{ client: '', duration: '' }])
+      setNotes(existingLog.notes || '')
+      setPrefilledFromRoster(false)
+      setRosterBlocks([])
+      return
     }
-  }, [weekISO, recentLogs])
+
+    // No log yet — fetch the roster and pre-fill sessions
+    setRosterLoading(true)
+    getRosterBlocks(weekISO)
+      .then(blocks => {
+        const myBlocks = blocks.filter(b => b.coach_name === displayName)
+        setRosterBlocks(myBlocks)
+        if (myBlocks.length > 0) {
+          // Unique session names from their roster
+          const sessions = [...new Set(myBlocks.map(b => b.session_type).filter(Boolean))]
+          setSelectedSessions(sessions)
+          setPrefilledFromRoster(true)
+        } else {
+          setSelectedSessions([])
+          setPrefilledFromRoster(false)
+        }
+        setHours('')
+        setPrivateClients([{ client: '', duration: '' }])
+        setNotes('')
+      })
+      .catch(() => {})
+      .finally(() => setRosterLoading(false))
+  }, [weekISO, recentLogs, displayName])
 
   function toggleSession(name) {
     setSelectedSessions(prev =>
@@ -86,7 +117,7 @@ export default function CoachLogPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!hours || parseFloat(hours) <= 0) { setError('Please enter hours worked'); return }
+    if (!hours || parseFloat(hours) <= 0) { setError('Please enter your total hours for this week'); return }
     setSubmitting(true)
     setError(null)
     try {
@@ -111,6 +142,13 @@ export default function CoachLogPage() {
   }
 
   const alreadyLogged = recentLogs.some(l => l.date === weekISO)
+
+  // Group roster blocks by day for the preview
+  const rosterByDay = DAY_KEYS.reduce((acc, d) => {
+    acc[d] = rosterBlocks.filter(b => b.day === d)
+    return acc
+  }, {})
+  const hasRoster = rosterBlocks.length > 0
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen bg-sand-50">
@@ -137,7 +175,7 @@ export default function CoachLogPage() {
           </div>
           <div>
             <p className="font-semibold text-sand-900 leading-none">{displayName}</p>
-            <p className="text-xs text-sand-400 mt-0.5">Promotable You · Coach Hours</p>
+            <p className="text-xs text-sand-400 mt-0.5">Promotable You · Weekly Hours</p>
           </div>
         </div>
 
@@ -146,9 +184,12 @@ export default function CoachLogPage() {
           <button onClick={() => setWeekOffset(o => o - 1)} className="p-1 rounded hover:bg-sand-200 text-sand-500 transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <div className="text-center min-w-[200px]">
+          <div className="text-center min-w-[220px]">
             <p className="text-sm font-semibold text-sand-900">{formatWeek(weekStart)}</p>
-            <p className="text-xs text-sand-400">{isCurrentWeek ? 'Current week' : weekOffset === -1 ? 'Last week' : `${Math.abs(weekOffset)} weeks ago`}{alreadyLogged ? ' · ✓ logged' : ''}</p>
+            <p className="text-xs text-sand-400">
+              {isCurrentWeek ? 'Current week' : weekOffset === -1 ? 'Last week' : `${Math.abs(weekOffset)} weeks ago`}
+              {alreadyLogged && <span className="text-emerald-500 font-medium"> · ✓ logged</span>}
+            </p>
           </div>
           <button onClick={() => setWeekOffset(o => Math.min(o + 1, 0))} disabled={isCurrentWeek} className="p-1 rounded hover:bg-sand-200 text-sand-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
             <ChevronRight className="w-4 h-4" />
@@ -163,25 +204,68 @@ export default function CoachLogPage() {
             {/* Left column */}
             <div className="col-span-2 space-y-5">
 
+              {/* Roster preview — only shown when pre-filling */}
+              {rosterLoading && (
+                <div className="bg-white border border-sand-200 rounded-2xl p-5 flex items-center gap-2 text-sand-400 text-sm">
+                  <div className="w-4 h-4 border-2 border-sand-300 border-t-transparent rounded-full animate-spin" />
+                  Loading your schedule…
+                </div>
+              )}
+
+              {!rosterLoading && hasRoster && !alreadyLogged && (
+                <div className="bg-white border border-sand-200 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CalendarDays className="w-4 h-4 text-blush-400" />
+                    <p className="text-sm font-semibold text-sand-800">Your roster this week</p>
+                    <span className="text-xs bg-blush-50 text-blush-500 border border-blush-100 px-2 py-0.5 rounded-full font-medium ml-auto">Sessions pre-filled below</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {DAY_KEYS.map(day => (
+                      <div key={day}>
+                        <p className="text-xs font-semibold text-sand-400 uppercase tracking-wide mb-1.5">{DAY_LABEL[day]}</p>
+                        <div className="space-y-1">
+                          {rosterByDay[day].length === 0 ? (
+                            <p className="text-xs text-sand-200">—</p>
+                          ) : rosterByDay[day].map((b, i) => (
+                            <div key={i} className="text-xs rounded-lg px-2 py-1.5 font-medium leading-snug" style={{ backgroundColor: sessionTypes.find(s => s.name === b.session_type)?.color || '#e5e7eb', color: '#1a1a1a' }}>
+                              {b.session_type}
+                              {b.time && <span className="block font-normal opacity-70">{b.time}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Hours */}
               <div className="bg-white border border-sand-200 rounded-2xl p-5">
                 <label className="block text-xs font-semibold text-sand-400 uppercase tracking-wide mb-3">Total hours this week</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="80"
-                  value={hours}
-                  onChange={e => setHours(e.target.value)}
-                  placeholder="e.g. 12"
-                  className="w-40 text-2xl font-bold text-sand-900 bg-sand-50 border border-sand-200 rounded-xl px-4 py-3 placeholder-sand-300 focus:border-blush-400 focus:outline-none focus:ring-2 focus:ring-blush-100 transition-colors"
-                />
+                <div className="flex items-baseline gap-3">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="80"
+                    value={hours}
+                    onChange={e => setHours(e.target.value)}
+                    placeholder="e.g. 12"
+                    className="w-36 text-2xl font-bold text-sand-900 bg-sand-50 border border-sand-200 rounded-xl px-4 py-3 placeholder-sand-300 focus:border-blush-400 focus:outline-none focus:ring-2 focus:ring-blush-100 transition-colors text-center"
+                  />
+                  <p className="text-sm text-sand-400">hours worked across the week</p>
+                </div>
               </div>
 
               {/* Sessions */}
               {sessionTypes.length > 0 && (
                 <div className="bg-white border border-sand-200 rounded-2xl p-5">
-                  <label className="block text-xs font-semibold text-sand-400 uppercase tracking-wide mb-3">Sessions run this week</label>
+                  <div className="flex items-center gap-2 mb-3">
+                    <label className="text-xs font-semibold text-sand-400 uppercase tracking-wide">Sessions run this week</label>
+                    {prefilledFromRoster && !alreadyLogged && (
+                      <span className="text-xs text-blush-500 font-medium ml-auto">Pre-filled from roster — edit as needed</span>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {sessionTypes.map(st => {
                       const selected = selectedSessions.includes(st.name)
@@ -191,7 +275,7 @@ export default function CoachLogPage() {
                           type="button"
                           onClick={() => toggleSession(st.name)}
                           className={`text-sm px-3 py-2 rounded-xl font-medium border transition-all ${
-                            selected ? 'text-white border-transparent shadow-sm' : 'bg-white text-sand-600 border-sand-200 hover:border-sand-400'
+                            selected ? 'text-white border-transparent shadow-sm' : 'bg-white text-sand-500 border-sand-200 hover:border-sand-400'
                           }`}
                           style={selected ? { backgroundColor: st.color || '#e5a0a0', borderColor: st.color || '#e5a0a0' } : {}}
                         >
