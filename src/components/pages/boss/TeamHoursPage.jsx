@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle, Download } from 'lucide-react'
-import { getTeamMembers, addTeamMember, deleteTeamMember, getTeamHours, upsertTeamHourRow } from '../../../lib/supabase'
+import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle, Download, Link, Clock, ClipboardCheck } from 'lucide-react'
+import { getTeamMembers, addTeamMember, deleteTeamMember, getTeamHours, upsertTeamHourRow, getAllCoachLogs, deleteCoachLog } from '../../../lib/supabase'
+import { COACHES } from '../../../lib/coaches'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function localISO(date = new Date()) {
@@ -140,6 +141,195 @@ function HourCell({ memberName, dateISO, value, leaveType, onChange }) {
   )
 }
 
+// ─── Coach Logs Tab ───────────────────────────────────────────────────────────
+function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset }) {
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [copiedId, setCopiedId] = useState(null)
+  const [expandedCoach, setExpandedCoach] = useState(null)
+
+  useEffect(() => {
+    getAllCoachLogs()
+      .then(l => setLogs(l))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const periodStartISO = localISO(periodStart)
+  const periodEndISO = localISO(periodEnd)
+
+  // Filter logs to current pay period
+  const periodLogs = logs.filter(l => l.date >= periodStartISO && l.date <= periodEndISO)
+
+  function copyLink(slug) {
+    const url = `${window.location.origin}/log/${slug}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(slug)
+      setTimeout(() => setCopiedId(null), 2000)
+    })
+  }
+
+  async function handleDeleteLog(id) {
+    if (!window.confirm('Delete this log entry?')) return
+    await deleteCoachLog(id)
+    setLogs(prev => prev.filter(l => l.id !== id))
+  }
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-5 h-5 border-2 border-warm-400 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  return (
+    <div className="space-y-5">
+      {/* Pay period navigator */}
+      <div className="bg-white border border-sand-200 rounded-2xl px-5 py-3 flex items-center justify-between">
+        <button onClick={() => setPeriodOffset(o => o - 1)} className="p-1.5 rounded-lg hover:bg-sand-100 text-sand-400 hover:text-sand-700 transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-sand-800">
+            {periodStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – {periodEnd.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
+          <p className="text-xs text-sand-400">
+            {periodOffset === 0 ? 'Current pay period' : periodOffset === -1 ? 'Previous pay period' : `${Math.abs(periodOffset)} periods ago`}
+          </p>
+        </div>
+        <button onClick={() => setPeriodOffset(o => Math.min(o + 1, 0))} disabled={periodOffset === 0} className="p-1.5 rounded-lg hover:bg-sand-100 text-sand-400 hover:text-sand-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {COACHES.map(coach => {
+            const coachPeriodLogs = periodLogs.filter(l => l.coach_name === coach.name)
+            const totalHours = coachPeriodLogs.reduce((s, l) => s + (parseFloat(l.hours) || 0), 0)
+            const allSessions = [...new Set(coachPeriodLogs.flatMap(l => l.sessions || []))]
+            const allClients = coachPeriodLogs.flatMap(l => (l.private_sessions || []).filter(p => p.client))
+            const isExpanded = expandedCoach === coach.slug
+
+            return (
+              <div key={coach.slug} className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
+                {/* Coach header */}
+                <div
+                  className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-sand-50 transition-colors"
+                  onClick={() => setExpandedCoach(isExpanded ? null : coach.slug)}
+                >
+                  <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-sm font-bold text-white bg-blush-400">
+                    {coach.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sand-900">{coach.name}</p>
+                    <p className="text-xs text-sand-400">
+                      {coach.email}
+                      {coachPeriodLogs.length > 0 && ` · ${coachPeriodLogs.length} log${coachPeriodLogs.length !== 1 ? 's' : ''} · ${totalHours.toFixed(1)}h`}
+                    </p>
+                  </div>
+                  {totalHours > 0 && (
+                    <span className="text-lg font-bold text-blush-500 mr-2">{totalHours.toFixed(1)}<span className="text-xs font-normal text-sand-400 ml-0.5">h</span></span>
+                  )}
+                  <button
+                    onClick={e => { e.stopPropagation(); copyLink(coach.slug) }}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all ${
+                      copiedId === coach.slug
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                        : 'bg-white border-sand-200 text-sand-600 hover:border-blush-300 hover:text-blush-500'
+                    }`}
+                  >
+                    <Link className="w-3 h-3" />
+                    {copiedId === coach.slug ? 'Copied!' : 'Copy link'}
+                  </button>
+                </div>
+
+                {/* Expanded log entries */}
+                {isExpanded && (
+                  <div className="border-t border-sand-100 px-5 pb-4">
+                    {coachPeriodLogs.length === 0 ? (
+                      <p className="text-sm text-sand-400 text-center py-6">No submissions this pay period</p>
+                    ) : (
+                      <div className="space-y-3 pt-4">
+                        {/* Summary chips */}
+                        {allSessions.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-sand-500 uppercase tracking-wide mb-2">Sessions run this period</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {allSessions.map(s => (
+                                <span key={s} className="text-xs bg-blush-50 text-blush-600 border border-blush-100 px-2.5 py-1 rounded-full font-medium">{s}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {allClients.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-sand-500 uppercase tracking-wide mb-2">Private 1:1 clients</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {allClients.map((c, i) => (
+                                <span key={i} className="text-xs bg-warm-50 text-warm-700 border border-warm-100 px-2.5 py-1 rounded-full font-medium">
+                                  {c.client}{c.duration ? ` · ${c.duration}` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Individual log entries */}
+                        <div>
+                          <p className="text-xs font-semibold text-sand-500 uppercase tracking-wide mb-2">Log entries</p>
+                          <div className="space-y-2">
+                            {coachPeriodLogs.map(log => (
+                              <div key={log.id} className="flex items-start gap-3 bg-sand-50 rounded-xl px-3 py-2.5">
+                                <div className="text-center shrink-0 min-w-[48px]">
+                                  <p className="text-[10px] font-semibold text-sand-500 uppercase">
+                                    {new Date(log.date + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short' })}
+                                  </p>
+                                  <p className="text-xs font-bold text-sand-800">
+                                    {new Date(log.date + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                                  </p>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <span className="text-sm font-bold text-blush-500">{log.hours}h</span>
+                                    {log.sessions?.length > 0 && (
+                                      <span className="text-xs text-sand-500 truncate">{log.sessions.join(', ')}</span>
+                                    )}
+                                  </div>
+                                  {log.private_sessions?.some(p => p.client) && (
+                                    <p className="text-xs text-sand-500">
+                                      1:1: {log.private_sessions.filter(p => p.client).map(p => `${p.client}${p.duration ? ` (${p.duration})` : ''}`).join(', ')}
+                                    </p>
+                                  )}
+                                  {log.notes && <p className="text-xs text-sand-400 italic mt-0.5">"{log.notes}"</p>}
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteLog(log.id)}
+                                  className="text-sand-200 hover:text-red-400 transition-colors shrink-0 mt-0.5"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+      {/* How it works tip */}
+      <div className="bg-warm-50 border border-warm-100 rounded-2xl px-5 py-4">
+        <p className="text-xs font-semibold text-warm-700 mb-1">How coach links work</p>
+        <p className="text-xs text-warm-600 leading-relaxed">
+          Each coach has a personal link — e.g. <span className="font-mono bg-warm-100 px-1 rounded">/log/bec</span>. They bookmark it and submit after each shift. No login needed. Hit <strong>Copy link</strong> above to grab it and send it to them.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function TeamHoursPage() {
   const [members, setMembers] = useState([])
@@ -149,6 +339,7 @@ export default function TeamHoursPage() {
   const [newName, setNewName] = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
   const [periodOffset, setPeriodOffset] = useState(0)
+  const [activeTab, setActiveTab] = useState('team')
 
   const TODAY_DATE = new Date()
   const baseStart = getPayPeriodStart(TODAY_DATE)
@@ -277,7 +468,7 @@ export default function TeamHoursPage() {
           <p className="text-sand-400 text-sm mt-0.5">{members.length} team member{members.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex items-center gap-2">
-          {members.length > 0 && (
+          {activeTab === 'team' && members.length > 0 && (
             <button
               onClick={exportCSV}
               className="flex items-center gap-2 bg-white border border-sand-200 hover:border-sand-400 text-sand-700 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
@@ -285,14 +476,49 @@ export default function TeamHoursPage() {
               <Download className="w-3.5 h-3.5" /> Export CSV
             </button>
           )}
-          <button
-            onClick={() => setShowAddMember(!showAddMember)}
-            className="flex items-center gap-2 bg-warm-500 hover:bg-warm-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Add Member
-          </button>
+          {activeTab === 'team' && (
+            <button
+              onClick={() => setShowAddMember(!showAddMember)}
+              className="flex items-center gap-2 bg-warm-500 hover:bg-warm-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Add Member
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-sand-100 rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setActiveTab('team')}
+          className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition-all ${
+            activeTab === 'team' ? 'bg-white shadow-sm text-sand-900' : 'text-sand-400 hover:text-sand-700'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" /> Team Hours
+        </button>
+        <button
+          onClick={() => setActiveTab('coaches')}
+          className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition-all ${
+            activeTab === 'coaches' ? 'bg-white shadow-sm text-sand-900' : 'text-sand-400 hover:text-sand-700'
+          }`}
+        >
+          <ClipboardCheck className="w-3.5 h-3.5" /> Coach Logs
+        </button>
+      </div>
+
+      {/* Coach Logs tab */}
+      {activeTab === 'coaches' && (
+        <CoachLogsTab
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          periodOffset={periodOffset}
+          setPeriodOffset={setPeriodOffset}
+        />
+      )}
+
+      {/* Team Hours tab content */}
+      {activeTab === 'team' && <>
 
       {error && (
         <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
@@ -559,6 +785,8 @@ export default function TeamHoursPage() {
           </div>
         </>
       )}
+
+      </> /* end Team Hours tab */}
     </div>
   )
 }

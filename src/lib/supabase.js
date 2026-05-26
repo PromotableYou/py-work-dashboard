@@ -371,6 +371,33 @@ export async function deleteRosterRow(id) {
   if (error) throw error
 }
 
+// ─── COACH LOGS ───────────────────────────────────────────────────────────────
+export async function getCoachLogs(coachName) {
+  const { data, error } = await supabase
+    .from('wd_coach_logs').select('*')
+    .eq('coach_name', coachName)
+    .order('date', { ascending: false })
+  if (error) throw error
+  return data
+}
+export async function getAllCoachLogs() {
+  const { data, error } = await supabase
+    .from('wd_coach_logs').select('*')
+    .order('date', { ascending: false })
+  if (error) throw error
+  return data
+}
+export async function addCoachLog(log) {
+  const { data, error } = await supabase
+    .from('wd_coach_logs').insert([log]).select().single()
+  if (error) throw error
+  return data
+}
+export async function deleteCoachLog(id) {
+  const { error } = await supabase.from('wd_coach_logs').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ─── ROSTER BLOCKS (drag-and-drop sessions) ───────────────────────────────────
 export async function getRosterBlocks(weekStart) {
   const { data, error } = await supabase
