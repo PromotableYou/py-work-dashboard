@@ -3,6 +3,7 @@ import {
   Plus, Check, Trash2, FileText, ChevronDown, ChevronUp,
   AlertCircle, Circle, GripVertical, X, RefreshCw,
   Timer, Pause, Play, RotateCcw, Palette, Calendar,
+  LayoutList, LayoutGrid,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
@@ -25,6 +26,7 @@ const PRIORITY_STYLES = {
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
 const FOCUS_KEY    = 'wd_today_focus'
+const VIEW_KEY     = 'wd_tasks_view'
 const REC_KEY      = 'wd_recurring_done'
 const STREAK_KEY   = 'wd_streak'
 function localISO(date = new Date()) {
@@ -272,6 +274,137 @@ function ProjectPanel({ project, subtasks, focusIds, onToggle, onDelete, onUpdat
           </form>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Kanban card ─────────────────────────────────────────────────────────────
+function KanbanCard({ project, subtasks, onToggle, onDelete }) {
+  const done  = subtasks.filter(s => s.completed).length
+  const total = subtasks.length
+  const pct   = total ? Math.round((done / total) * 100) : 0
+  const priority   = PRIORITY_STYLES[project.priority] || PRIORITY_STYLES.medium
+  const accentColor = project.color || '#F0457A'
+  const due = dueBadge(project.due_date)
+
+  return (
+    <div
+      draggable
+      onDragStart={e => { e.dataTransfer.setData('project_id', String(project.id)); e.dataTransfer.effectAllowed = 'move' }}
+      className={`bg-white rounded-xl border border-sand-200 overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-md transition-all group ${project.done ? 'opacity-60' : ''}`}
+    >
+      <div className="h-1" style={{ background: accentColor }} />
+      <div className="p-3">
+        <div className="flex items-start gap-2">
+          <button
+            onClick={() => onToggle(project)}
+            className="mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+            style={project.done ? { background: accentColor, borderColor: accentColor } : { borderColor: accentColor + '88' }}
+          >
+            {project.done && <Check className="w-2.5 h-2.5 text-white" />}
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-semibold leading-tight ${project.done ? 'line-through text-sand-400' : 'text-sand-900'}`}>
+              {project.name}
+            </p>
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${priority.badge}`}>
+                {project.priority}
+              </span>
+              {due && (
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${due.cls}`}>
+                  {due.label}
+                </span>
+              )}
+            </div>
+            {total > 0 && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <div className="flex-1 h-1 bg-sand-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: accentColor }} />
+                </div>
+                <span className="text-[10px] text-sand-400 shrink-0">{done}/{total}</span>
+              </div>
+            )}
+          </div>
+          <button onClick={() => onDelete(project.id)}
+            className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Kanban board ─────────────────────────────────────────────────────────────
+const KANBAN_COLS = [
+  { id: 'todo',        label: 'To Do',       bg: 'bg-sand-50',     border: 'border-sand-200',    hdr: 'text-sand-600',    dot: 'bg-sand-400'    },
+  { id: 'in_progress', label: 'In Progress', bg: 'bg-orange-50',   border: 'border-orange-200',  hdr: 'text-orange-700',  dot: 'bg-orange-400'  },
+  { id: 'done',        label: 'Done',        bg: 'bg-emerald-50',  border: 'border-emerald-200', hdr: 'text-emerald-700', dot: 'bg-emerald-400' },
+]
+
+function getProjectStatus(p) {
+  if (p.done) return 'done'
+  return p.status || 'todo'
+}
+
+function KanbanBoard({ projects, subtasks, onToggle, onDelete, onMoveStatus }) {
+  const [dragOver, setDragOver] = useState(null)
+
+  function handleDrop(e, colId) {
+    e.preventDefault()
+    setDragOver(null)
+    const projectId = e.dataTransfer.getData('project_id')
+    if (!projectId) return
+    onMoveStatus(projectId, colId)
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      {KANBAN_COLS.map(col => {
+        const colProjects = projects.filter(p => getProjectStatus(p) === col.id)
+        const isOver = dragOver === col.id
+        return (
+          <div
+            key={col.id}
+            onDragOver={e => { e.preventDefault(); setDragOver(col.id) }}
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(null) }}
+            onDrop={e => handleDrop(e, col.id)}
+            className={`rounded-2xl border-2 min-h-[260px] flex flex-col transition-colors ${isOver ? 'border-blush-300 bg-blush-50/60' : `${col.bg} ${col.border}`}`}
+          >
+            {/* Column header */}
+            <div className="px-4 py-3 flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot}`} />
+              <h3 className={`text-xs font-bold uppercase tracking-widest ${col.hdr}`}>{col.label}</h3>
+              <span className="ml-auto text-xs font-semibold text-sand-400 bg-white rounded-full px-2 py-0.5 border border-sand-200">
+                {colProjects.length}
+              </span>
+            </div>
+            {/* Cards */}
+            <div className="px-3 pb-3 space-y-2 flex-1">
+              {colProjects.length === 0 && (
+                <p className={`text-xs text-center py-10 transition-colors ${isOver ? 'text-blush-400 font-medium' : 'text-sand-300'}`}>
+                  {isOver ? '✨ Drop here' : 'No projects'}
+                </p>
+              )}
+              {colProjects.map(p => (
+                <KanbanCard
+                  key={p.id}
+                  project={p}
+                  subtasks={subtasks.filter(s => s.project_id === p.id)}
+                  onToggle={onToggle}
+                  onDelete={onDelete}
+                />
+              ))}
+              {isOver && colProjects.length > 0 && (
+                <div className="border-2 border-dashed border-blush-300 rounded-xl py-3 text-center">
+                  <p className="text-xs text-blush-400 font-medium">Drop here</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -539,6 +672,7 @@ export default function TasksPage({ workspace = 'shaniah' }) {
   const [error, setError]             = useState(null)
   const [showAddProject, setShowAdd]  = useState(false)
   const [newProject, setNewProject]   = useState({ name: '', priority: 'medium', due_date: '', color: '#F0457A' })
+  const [view, setView]               = useState(() => localStorage.getItem(VIEW_KEY) || 'list')
 
   useEffect(() => {
     Promise.all([getProjects(workspace), getSubtasks(workspace), getRecurringTasks(workspace)])
@@ -562,9 +696,11 @@ export default function TasksPage({ workspace = 'shaniah' }) {
     } catch (e) { setError(e.message) }
   }
   async function handleToggleProject(project) {
+    const nowDone = !project.done
+    const statusVal = nowDone ? 'done' : 'todo'
     try {
-      await updateProject(project.id, { done: !project.done })
-      setProjects(p => p.map(pr => pr.id === project.id ? { ...pr, done: !pr.done } : pr))
+      await updateProject(project.id, { done: nowDone, status: statusVal })
+      setProjects(p => p.map(pr => pr.id === project.id ? { ...pr, done: nowDone, status: statusVal } : pr))
     } catch (e) { setError(e.message) }
   }
   async function handleUpdateProject(id, updates) {
@@ -609,6 +745,18 @@ export default function TasksPage({ workspace = 'shaniah' }) {
     catch (e) { setError(e.message) }
   }
 
+  async function handleMoveStatus(projectId, newStatus) {
+    const id = parseInt(projectId, 10) || projectId
+    const nowDone = newStatus === 'done'
+    try {
+      await updateProject(id, { done: nowDone, status: newStatus })
+      setProjects(p => p.map(pr => pr.id === id ? { ...pr, done: nowDone, status: newStatus } : pr))
+      if (nowDone) popConfetti()
+    } catch (e) { setError(e.message) }
+  }
+
+  function switchView(v) { setView(v); localStorage.setItem(VIEW_KEY, v) }
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-6 h-6 border-2 border-blush-400 border-t-transparent rounded-full animate-spin" />
@@ -622,10 +770,27 @@ export default function TasksPage({ workspace = 'shaniah' }) {
           <h1 className="text-xl font-bold text-sand-900">Tasks</h1>
           <p className="text-sand-400 text-sm mt-0.5">{activeProjects.length} active project{activeProjects.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setShowAdd(!showAddProject)}
-          className="flex items-center gap-2 bg-blush-500 hover:bg-blush-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
-          <Plus className="w-4 h-4" /> New Project
-        </button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center bg-sand-100 rounded-xl p-1 gap-0.5">
+            <button
+              onClick={() => switchView('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${view === 'list' ? 'bg-white text-sand-800 shadow-sm' : 'text-sand-400 hover:text-sand-600'}`}
+            >
+              <LayoutList className="w-3.5 h-3.5" /> List
+            </button>
+            <button
+              onClick={() => switchView('kanban')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${view === 'kanban' ? 'bg-white text-sand-800 shadow-sm' : 'text-sand-400 hover:text-sand-600'}`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" /> Board
+            </button>
+          </div>
+          <button onClick={() => setShowAdd(!showAddProject)}
+            className="flex items-center gap-2 bg-blush-500 hover:bg-blush-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
+            <Plus className="w-4 h-4" /> New Project
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -634,62 +799,61 @@ export default function TasksPage({ workspace = 'shaniah' }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 space-y-4">
-
-          {showAddProject && (
-            <div className="bg-white border-2 border-blush-200 rounded-2xl p-5 space-y-3">
-              <h3 className="font-semibold text-sand-900 text-sm">New Project</h3>
-              <form onSubmit={handleAddProject} className="space-y-3">
-                <input value={newProject.name}
-                  onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
-                  placeholder="Project name…" autoFocus
-                  className="w-full text-sm bg-sand-50 border border-sand-200 rounded-xl px-4 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-blush-200 focus:outline-none"
-                />
-                {/* Priority */}
-                <div className="flex gap-2">
-                  {['high', 'medium', 'low'].map(p => (
-                    <button key={p} type="button"
-                      onClick={() => setNewProject(prev => ({ ...prev, priority: p }))}
-                      className={`flex-1 text-xs py-2 rounded-xl border font-semibold capitalize transition-colors ${
-                        newProject.priority === p
-                          ? p === 'high' ? 'bg-red-500 border-red-500 text-white'
-                          : p === 'medium' ? 'bg-amber-500 border-amber-500 text-white'
-                          : 'bg-sand-400 border-sand-400 text-white'
-                          : 'bg-white border-sand-200 text-sand-400 hover:border-sand-300'
-                      }`}>{p}</button>
-                  ))}
-                </div>
-                {/* Colour + due date row */}
-                <div className="flex items-center gap-4">
-                  <div className="flex gap-1.5 items-center">
-                    {PROJECT_COLORS.map(c => (
-                      <button key={c} type="button"
-                        onClick={() => setNewProject(p => ({ ...p, color: c }))}
-                        className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
-                        style={{ background: c, borderColor: newProject.color === c ? '#1e293b' : 'transparent' }}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 flex-1">
-                    <Calendar className="w-3.5 h-3.5 text-sand-400 shrink-0" />
-                    <input type="date" value={newProject.due_date}
-                      onChange={e => setNewProject(p => ({ ...p, due_date: e.target.value }))}
-                      className="flex-1 text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-1.5 text-sand-800 focus:outline-none focus:ring-2 focus:ring-blush-200"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setShowAdd(false)}
-                    className="flex-1 text-sm text-sand-500 py-2 rounded-xl border border-sand-200 hover:bg-sand-50 transition-colors">Cancel</button>
-                  <button type="submit"
-                    className="flex-1 text-sm bg-blush-500 hover:bg-blush-600 text-white py-2 rounded-xl font-semibold transition-colors">Create Project</button>
-                </div>
-              </form>
+      {/* ── Add project form (shared between views) ── */}
+      {showAddProject && (
+        <div className="bg-white border-2 border-blush-200 rounded-2xl p-5 space-y-3 mb-5">
+          <h3 className="font-semibold text-sand-900 text-sm">New Project</h3>
+          <form onSubmit={handleAddProject} className="space-y-3">
+            <input value={newProject.name}
+              onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
+              placeholder="Project name…" autoFocus
+              className="w-full text-sm bg-sand-50 border border-sand-200 rounded-xl px-4 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-blush-200 focus:outline-none"
+            />
+            <div className="flex gap-2">
+              {['high', 'medium', 'low'].map(p => (
+                <button key={p} type="button"
+                  onClick={() => setNewProject(prev => ({ ...prev, priority: p }))}
+                  className={`flex-1 text-xs py-2 rounded-xl border font-semibold capitalize transition-colors ${
+                    newProject.priority === p
+                      ? p === 'high' ? 'bg-red-500 border-red-500 text-white'
+                      : p === 'medium' ? 'bg-amber-500 border-amber-500 text-white'
+                      : 'bg-sand-400 border-sand-400 text-white'
+                      : 'bg-white border-sand-200 text-sand-400 hover:border-sand-300'
+                  }`}>{p}</button>
+              ))}
             </div>
-          )}
+            <div className="flex items-center gap-4">
+              <div className="flex gap-1.5 items-center">
+                {PROJECT_COLORS.map(c => (
+                  <button key={c} type="button"
+                    onClick={() => setNewProject(p => ({ ...p, color: c }))}
+                    className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
+                    style={{ background: c, borderColor: newProject.color === c ? '#1e293b' : 'transparent' }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2 flex-1">
+                <Calendar className="w-3.5 h-3.5 text-sand-400 shrink-0" />
+                <input type="date" value={newProject.due_date}
+                  onChange={e => setNewProject(p => ({ ...p, due_date: e.target.value }))}
+                  className="flex-1 text-sm bg-sand-50 border border-sand-200 rounded-lg px-3 py-1.5 text-sand-800 focus:outline-none focus:ring-2 focus:ring-blush-200"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setShowAdd(false)}
+                className="flex-1 text-sm text-sand-500 py-2 rounded-xl border border-sand-200 hover:bg-sand-50 transition-colors">Cancel</button>
+              <button type="submit"
+                className="flex-1 text-sm bg-blush-500 hover:bg-blush-600 text-white py-2 rounded-xl font-semibold transition-colors">Create Project</button>
+            </div>
+          </form>
+        </div>
+      )}
 
-          {activeProjects.length === 0 && !showAddProject && (
+      {/* ── Kanban view ── */}
+      {view === 'kanban' && (
+        <div>
+          {projects.length === 0 && !showAddProject && (
             <div className="bg-white border border-sand-200 rounded-2xl px-5 py-16 text-center">
               <p className="text-sand-400 text-sm">No projects yet</p>
               <button onClick={() => setShowAdd(true)} className="text-blush-500 text-sm font-medium mt-2 hover:text-blush-600">
@@ -697,37 +861,62 @@ export default function TasksPage({ workspace = 'shaniah' }) {
               </button>
             </div>
           )}
-
-          {activeProjects.map(p => (
-            <ProjectPanel key={p.id} project={p}
-              subtasks={subtasks.filter(s => s.project_id === p.id)}
-              focusIds={focusIds}
+          {projects.length > 0 && (
+            <KanbanBoard
+              projects={projects}
+              subtasks={subtasks}
               onToggle={handleToggleProject}
               onDelete={handleDeleteProject}
-              onUpdate={handleUpdateProject}
-              onAddSub={handleAddSub}
-              onToggleSub={handleToggleSub}
-              onDeleteSub={handleDeleteSub}
+              onMoveStatus={handleMoveStatus}
             />
-          ))}
-
-          {projects.filter(p => p.done).length > 0 && (
-            <p className="text-xs text-sand-400 text-center pt-2">
-              {projects.filter(p => p.done).length} completed project{projects.filter(p => p.done).length > 1 ? 's' : ''} hidden
-            </p>
           )}
         </div>
+      )}
 
-        <div>
-          <Notepad
-            subtasks={subtasks}
-            onToggleSub={handleToggleSub}
-            recurringTasks={recurring}
-            onAddRecurring={handleAddRecurring}
-            onDeleteRecurring={handleDeleteRecurring}
-          />
+      {/* ── List view ── */}
+      {view === 'list' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-4">
+            {activeProjects.length === 0 && !showAddProject && (
+              <div className="bg-white border border-sand-200 rounded-2xl px-5 py-16 text-center">
+                <p className="text-sand-400 text-sm">No projects yet</p>
+                <button onClick={() => setShowAdd(true)} className="text-blush-500 text-sm font-medium mt-2 hover:text-blush-600">
+                  Create your first project →
+                </button>
+              </div>
+            )}
+
+            {activeProjects.map(p => (
+              <ProjectPanel key={p.id} project={p}
+                subtasks={subtasks.filter(s => s.project_id === p.id)}
+                focusIds={focusIds}
+                onToggle={handleToggleProject}
+                onDelete={handleDeleteProject}
+                onUpdate={handleUpdateProject}
+                onAddSub={handleAddSub}
+                onToggleSub={handleToggleSub}
+                onDeleteSub={handleDeleteSub}
+              />
+            ))}
+
+            {projects.filter(p => p.done).length > 0 && (
+              <p className="text-xs text-sand-400 text-center pt-2">
+                {projects.filter(p => p.done).length} completed project{projects.filter(p => p.done).length > 1 ? 's' : ''} hidden
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Notepad
+              subtasks={subtasks}
+              onToggleSub={handleToggleSub}
+              recurringTasks={recurring}
+              onAddRecurring={handleAddRecurring}
+              onDeleteRecurring={handleDeleteRecurring}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
