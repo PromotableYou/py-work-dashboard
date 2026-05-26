@@ -255,21 +255,24 @@ export default function CoachLogPage() {
 
                   {/* Sessions */}
                   <div>
-                    <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide mb-1.5">Sessions</p>
-                    <div className="flex flex-wrap gap-1 min-h-[24px]">
+                    <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide mb-1.5">Sessions</p>
+                    <div className="flex flex-wrap gap-1 min-h-[28px]">
+                      {d.sessions.length === 0 && (
+                        <p className="text-xs text-sand-400 italic">None yet</p>
+                      )}
                       {d.sessions.map(name => {
                         const st = sessionTypes.find(s => s.name === name)
                         return (
                           <span
                             key={name}
-                            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg leading-none"
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg leading-none border border-black/10"
                             style={{ backgroundColor: st?.color || '#e5e7eb', color: '#1a1a1a' }}
                           >
                             {name}
                             <button
                               type="button"
                               onClick={() => removeSession(day, name)}
-                              className="opacity-50 hover:opacity-100 transition-opacity ml-0.5"
+                              className="opacity-60 hover:opacity-100 transition-opacity ml-0.5"
                             >
                               <X className="w-2.5 h-2.5" />
                             </button>
@@ -280,24 +283,24 @@ export default function CoachLogPage() {
 
                     {/* Add session picker */}
                     {availableSessions.length > 0 && (
-                      <div className="relative mt-1.5" onClick={e => e.stopPropagation()}>
+                      <div className="relative mt-2" onClick={e => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={() => setOpenPicker(openPicker === day ? null : day)}
-                          className="flex items-center gap-1 text-xs text-sand-400 hover:text-blush-500 transition-colors font-medium"
+                          className="flex items-center gap-1 text-xs text-blush-600 hover:text-blush-700 font-semibold border border-blush-200 bg-blush-50 hover:bg-blush-100 px-2 py-1 rounded-lg transition-colors"
                         >
                           <Plus className="w-3 h-3" /> Add session
                         </button>
                         {openPicker === day && (
-                          <div className="absolute z-20 top-full left-0 mt-1 bg-white border border-sand-200 rounded-xl shadow-lg py-1 min-w-[180px] max-h-52 overflow-y-auto">
+                          <div className="absolute z-20 top-full left-0 mt-1 bg-white border border-sand-300 rounded-xl shadow-lg py-1 min-w-[190px] max-h-52 overflow-y-auto">
                             {availableSessions.map(st => (
                               <button
                                 key={st.id}
                                 type="button"
                                 onClick={() => addSession(day, st.name)}
-                                className="w-full text-left text-xs px-3 py-2 hover:bg-sand-50 transition-colors flex items-center gap-2 text-sand-700"
+                                className="w-full text-left text-xs px-3 py-2 hover:bg-sand-50 transition-colors flex items-center gap-2 text-sand-800 font-medium"
                               >
-                                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: st.color || '#e5e7eb' }} />
+                                <span className="w-3 h-3 rounded shrink-0 border border-black/10" style={{ backgroundColor: st.color || '#e5e7eb' }} />
                                 {st.name}
                               </button>
                             ))}
@@ -310,13 +313,17 @@ export default function CoachLogPage() {
                   {/* 1:1 clients */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">1:1 Clients</p>
-                      <button type="button" onClick={() => addClient(day)} className="text-xs text-blush-400 hover:text-blush-500 font-medium flex items-center gap-0.5">
-                        <Plus className="w-3 h-3" />
+                      <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide">1:1 Clients</p>
+                      <button type="button" onClick={() => addClient(day)} className="text-xs text-blush-600 hover:text-blush-700 font-semibold flex items-center gap-0.5">
+                        <Plus className="w-3 h-3" /> Add
                       </button>
                     </div>
                     {d.clients.length === 0 ? (
-                      <button type="button" onClick={() => addClient(day)} className="text-xs text-sand-300 hover:text-sand-400 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => addClient(day)}
+                        className="text-xs text-sand-500 hover:text-blush-600 font-medium border border-dashed border-sand-300 hover:border-blush-300 rounded-lg px-2 py-1.5 w-full text-center transition-colors"
+                      >
                         + Add client
                       </button>
                     ) : (
@@ -327,18 +334,18 @@ export default function CoachLogPage() {
                               type="text"
                               value={c.client}
                               onChange={e => updateClient(day, idx, 'client', e.target.value)}
-                              placeholder="Client"
-                              className="flex-1 text-xs bg-sand-50 border border-sand-200 rounded-lg px-2 py-1.5 text-sand-800 placeholder-sand-300 focus:ring-1 focus:ring-blush-300 focus:outline-none min-w-0"
+                              placeholder="Client name"
+                              className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0"
                             />
                             <input
                               type="text"
                               value={c.duration}
                               onChange={e => updateClient(day, idx, 'duration', e.target.value)}
                               placeholder="1hr"
-                              className="w-10 text-xs bg-sand-50 border border-sand-200 rounded-lg px-1.5 py-1.5 text-sand-800 placeholder-sand-300 focus:ring-1 focus:ring-blush-300 focus:outline-none"
+                              className="w-12 text-xs bg-white border border-sand-300 rounded-lg px-1.5 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
                             />
-                            <button type="button" onClick={() => removeClient(day, idx)} className="text-sand-200 hover:text-red-400 transition-colors shrink-0">
-                              <X className="w-3 h-3" />
+                            <button type="button" onClick={() => removeClient(day, idx)} className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ))}
@@ -347,9 +354,9 @@ export default function CoachLogPage() {
                   </div>
 
                   {/* Hours */}
-                  <div className="mt-auto pt-2 border-t border-sand-50">
+                  <div className="mt-auto pt-2.5 border-t border-sand-200">
                     <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-bold text-sand-400 uppercase tracking-wide whitespace-nowrap">Hrs worked</label>
+                      <label className="text-[10px] font-bold text-sand-600 uppercase tracking-wide whitespace-nowrap">Hours worked</label>
                       <input
                         type="number"
                         step="0.5"
@@ -357,8 +364,8 @@ export default function CoachLogPage() {
                         max="24"
                         value={d.hours}
                         onChange={e => setField(day, 'hours', e.target.value)}
-                        placeholder="–"
-                        className="w-16 text-sm font-bold text-sand-900 bg-sand-50 border border-sand-200 rounded-lg px-2 py-1.5 text-center placeholder-sand-300 focus:ring-1 focus:ring-blush-300 focus:outline-none"
+                        placeholder="0"
+                        className="w-16 text-sm font-bold text-sand-900 bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-center placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
                       />
                     </div>
                   </div>
