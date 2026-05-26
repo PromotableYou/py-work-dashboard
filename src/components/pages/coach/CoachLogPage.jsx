@@ -248,7 +248,13 @@ export default function CoachLogPage() {
                       <p className={`text-sm font-bold ${isToday ? 'text-blush-600' : 'text-sand-800'}`}>{DAY_SHORT[day]}</p>
                       <p className="text-xs text-sand-400">{date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</p>
                     </div>
-                    {isLogged && <span className="text-emerald-500 text-xs font-semibold">✓ saved</span>}
+                    {(() => {
+                      const log = recentLogs.find(l => l.date === iso)
+                      if (!log) return null
+                      return log.approved
+                        ? <span className="text-emerald-600 text-xs font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">✓ approved</span>
+                        : <span className="text-amber-600 text-xs font-semibold">saved</span>
+                    })()}
                   </div>
                 </div>
 

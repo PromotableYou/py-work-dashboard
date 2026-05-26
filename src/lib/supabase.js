@@ -407,6 +407,34 @@ export async function updateCoachLog(id, updates) {
   if (error) throw error
   return data
 }
+export async function approveCoachLog(logId, { person_name, date, hours }) {
+  // Mark log as approved
+  const { error: e1 } = await supabase
+    .from('wd_coach_logs')
+    .update({ approved: true, approved_at: new Date().toISOString() })
+    .eq('id', logId)
+  if (e1) throw e1
+  // Write hours into team hours grid
+  const { error: e2 } = await supabase
+    .from('wd_team_hours')
+    .upsert([{ person_name, date, hours, worked: true, type: 'Normal' }], { onConflict: 'person_name,date' })
+  if (e2) throw e2
+}
+export async function unapproveCoachLog(logId, { person_name, date }) {
+  // Unmark approval
+  const { error: e1 } = await supabase
+    .from('wd_coach_logs')
+    .update({ approved: false, approved_at: null })
+    .eq('id', logId)
+  if (e1) throw e1
+  // Remove from team hours
+  const { error: e2 } = await supabase
+    .from('wd_team_hours')
+    .delete()
+    .eq('person_name', person_name)
+    .eq('date', date)
+  if (e2) throw e2
+}
 export async function deleteCoachLog(id) {
   const { error } = await supabase.from('wd_coach_logs').delete().eq('id', id)
   if (error) throw error

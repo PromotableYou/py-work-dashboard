@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle, Download, Link, Clock, ClipboardCheck } from 'lucide-react'
-import { getTeamMembers, addTeamMember, deleteTeamMember, getTeamHours, upsertTeamHourRow, getAllCoachLogs, deleteCoachLog } from '../../../lib/supabase'
+import { Plus, Trash2, Users, ChevronLeft, ChevronRight, AlertCircle, Download, Link, Clock, ClipboardCheck, CheckCircle, XCircle } from 'lucide-react'
+import { getTeamMembers, addTeamMember, deleteTeamMember, getTeamHours, upsertTeamHourRow, getAllCoachLogs, deleteCoachLog, approveCoachLog, unapproveCoachLog } from '../../../lib/supabase'
 import { COACHES } from '../../../lib/coaches'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -174,6 +174,16 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset })
     setLogs(prev => prev.filter(l => l.id !== id))
   }
 
+  async function handleApprove(log, coachName) {
+    await approveCoachLog(log.id, { person_name: coachName, date: log.date, hours: log.hours })
+    setLogs(prev => prev.map(l => l.id === log.id ? { ...l, approved: true } : l))
+  }
+
+  async function handleUnapprove(log, coachName) {
+    await unapproveCoachLog(log.id, { person_name: coachName, date: log.date })
+    setLogs(prev => prev.map(l => l.id === log.id ? { ...l, approved: false } : l))
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-20">
       <div className="w-5 h-5 border-2 border-warm-400 border-t-transparent rounded-full animate-spin" />
@@ -274,10 +284,24 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset })
 
                         {/* Individual log entries */}
                         <div>
-                          <p className="text-xs font-semibold text-sand-500 uppercase tracking-wide mb-2">Log entries</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-sand-500 uppercase tracking-wide">Log entries</p>
+                            {coachPeriodLogs.some(l => !l.approved) && (
+                              <button
+                                onClick={async () => {
+                                  for (const log of coachPeriodLogs.filter(l => !l.approved)) {
+                                    await handleApprove(log, coach.name)
+                                  }
+                                }}
+                                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                              >
+                                <CheckCircle className="w-3 h-3" /> Approve all
+                              </button>
+                            )}
+                          </div>
                           <div className="space-y-2">
                             {coachPeriodLogs.map(log => (
-                              <div key={log.id} className="flex items-start gap-3 bg-sand-50 rounded-xl px-3 py-2.5">
+                              <div key={log.id} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 border ${log.approved ? 'bg-emerald-50 border-emerald-100' : 'bg-sand-50 border-sand-100'}`}>
                                 <div className="text-center shrink-0 min-w-[48px]">
                                   <p className="text-[10px] font-semibold text-sand-500 uppercase">
                                     {new Date(log.date + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short' })}
@@ -289,6 +313,7 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset })
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-0.5">
                                     <span className="text-sm font-bold text-blush-500">{log.hours}h</span>
+                                    {log.approved && <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">✓ approved</span>}
                                     {log.sessions?.length > 0 && (
                                       <span className="text-xs text-sand-500 truncate">{log.sessions.join(', ')}</span>
                                     )}
@@ -304,12 +329,31 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset })
                                     </p>
                                   )}
                                 </div>
-                                <button
-                                  onClick={() => handleDeleteLog(log.id)}
-                                  className="text-sand-200 hover:text-red-400 transition-colors shrink-0 mt-0.5"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {log.approved ? (
+                                    <button
+                                      onClick={() => handleUnapprove(log, coach.name)}
+                                      title="Unapprove"
+                                      className="text-emerald-400 hover:text-sand-400 transition-colors"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleApprove(log, coach.name)}
+                                      title="Approve & add to Team Hours"
+                                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors"
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeleteLog(log.id)}
+                                    className="text-sand-200 hover:text-red-400 transition-colors ml-0.5"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
