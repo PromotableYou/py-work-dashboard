@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, X, CheckCircle } from 'lucide-react'
-import { getSessionTypes, getCoachLogs, upsertCoachLog, getRosterBlocks } from '../../../lib/supabase'
+import { getSessionTypes, getCoachLogs, addCoachLog, updateCoachLog, getRosterBlocks } from '../../../lib/supabase'
 import { coachBySlug } from '../../../lib/coaches'
 
 const DAY_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri']
@@ -132,14 +132,22 @@ export default function CoachLogPage() {
         const d = dayData[day]
         const hasAnything = d.hours || d.sessions.length > 0 || d.clients.some(c => c.client.trim())
         if (!hasAnything) continue
-        await upsertCoachLog({
+        const iso = dayISO(day)
+        const payload = {
           coach_name: displayName,
-          date: dayISO(day),
+          date: iso,
           hours: parseFloat(d.hours) || 0,
           sessions: d.sessions,
           private_sessions: d.clients.filter(c => c.client.trim()),
           notes: '',
-        })
+        }
+        // Update if a log already exists for this day, otherwise insert
+        const existing = recentLogs.find(l => l.date === iso && l.coach_name === displayName)
+        if (existing) {
+          await updateCoachLog(existing.id, payload)
+        } else {
+          await addCoachLog(payload)
+        }
       }
       setSubmitted(true)
       const logs = await getCoachLogs(displayName)

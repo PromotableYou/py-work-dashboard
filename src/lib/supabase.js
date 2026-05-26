@@ -401,6 +401,12 @@ export async function upsertCoachLog(log) {
   if (error) throw error
   return data
 }
+export async function updateCoachLog(id, updates) {
+  const { data, error } = await supabase
+    .from('wd_coach_logs').update(updates).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
 export async function deleteCoachLog(id) {
   const { error } = await supabase.from('wd_coach_logs').delete().eq('id', id)
   if (error) throw error
