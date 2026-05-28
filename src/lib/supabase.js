@@ -448,9 +448,10 @@ export async function approveCoachLog(logId, { person_name, date, hours, coachin
   }
 
   // Write total hours into team hours grid (split is stored in wd_coach_logs only)
-  const totalHours = (coaching_hours != null || admin_hours != null)
-    ? (parseFloat(coaching_hours) || 0) + (parseFloat(admin_hours) || 0)
-    : (hours || 0)
+  // Always prefer `hours` (the total the coach manually entered/confirmed)
+  // and only fall back to coaching+admin sum if hours is absent
+  const totalHours = parseFloat(hours) ||
+    ((parseFloat(coaching_hours) || 0) + (parseFloat(admin_hours) || 0))
   const { error: e2 } = await supabase
     .from('wd_team_hours')
     .upsert([{ person_name, date, hours: totalHours, worked: true, type: 'Normal' }],

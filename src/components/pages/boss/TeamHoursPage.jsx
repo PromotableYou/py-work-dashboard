@@ -452,6 +452,9 @@ export default function TeamHoursPage() {
   const [showAddMember, setShowAddMember] = useState(false)
   const [periodOffset, setPeriodOffset] = useState(0)
   const [activeTab, setActiveTab] = useState('team')
+  const [payRates, setPayRates] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('wd_pay_rates') || '{}') } catch { return {} }
+  })
 
   const TODAY_DATE = new Date()
   const baseStart = getPayPeriodStart(TODAY_DATE)
@@ -504,6 +507,15 @@ export default function TeamHoursPage() {
     try { await deleteTeamMember(id); setMembers(prev => prev.filter(m => m.id !== id)) }
     catch (e) { setError(e.message) }
   }
+
+  function setPayRate(name, val) {
+    setPayRates(prev => {
+      const next = { ...prev, [name]: val }
+      localStorage.setItem('wd_pay_rates', JSON.stringify(next))
+      return next
+    })
+  }
+  const getRate = (name) => parseFloat(payRates[name]) || 0
 
   // Totals
   const memberTotal = (name) => days.reduce((s, d) => s + getHours(name, localISO(d)), 0)
@@ -809,6 +821,10 @@ export default function TeamHoursPage() {
                     <th className="text-center px-3 py-2.5 text-xs font-semibold text-sand-500">Wk 1</th>
                     <th className="text-center px-3 py-2.5 text-xs font-semibold text-sand-500">Wk 2</th>
                     <th className="text-center px-3 py-2.5 text-xs font-semibold text-sand-500">Total hrs</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-semibold text-emerald-600">$/hr</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-semibold text-emerald-500">Wk 1 cost</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-semibold text-emerald-500">Wk 2 cost</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-semibold text-emerald-600 border-r border-sand-200">Period cost</th>
                     <th className="text-center px-3 py-2.5 text-xs font-semibold text-blue-400">AL</th>
                     <th className="text-center px-3 py-2.5 text-xs font-semibold text-amber-400">SL</th>
                     <th className="text-center px-3 py-2.5 text-xs font-semibold text-purple-400">PH</th>
@@ -817,8 +833,14 @@ export default function TeamHoursPage() {
                 </thead>
                 <tbody>
                   {members.map((member, i) => {
-                    const leave = leaveSummary(member.name)
-                    const total = memberTotal(member.name)
+                    const leave     = leaveSummary(member.name)
+                    const total     = memberTotal(member.name)
+                    const wk1       = memberWeekTotal(member.name, week1)
+                    const wk2       = memberWeekTotal(member.name, week2)
+                    const rate      = getRate(member.name)
+                    const wk1cost   = wk1 * rate
+                    const wk2cost   = wk2 * rate
+                    const totalCost = total * rate
                     return (
                       <tr key={member.id} className={`border-b border-sand-50 last:border-0 ${i % 2 === 0 ? '' : 'bg-sand-50/40'}`}>
                         <td className="px-5 py-3">
@@ -830,10 +852,36 @@ export default function TeamHoursPage() {
                             <span className="text-sm font-medium text-sand-800">{member.name}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-center text-sm text-sand-700">{fmtNum(memberWeekTotal(member.name, week1))}</td>
-                        <td className="px-3 py-3 text-center text-sm text-sand-700">{fmtNum(memberWeekTotal(member.name, week2))}</td>
+                        <td className="px-3 py-3 text-center text-sm text-sand-700">{fmtNum(wk1)}</td>
+                        <td className="px-3 py-3 text-center text-sm text-sand-700">{fmtNum(wk2)}</td>
                         <td className="px-3 py-3 text-center">
                           <span className={`text-sm font-bold ${total > 0 ? 'text-blush-600' : 'text-sand-300'}`}>{fmtNum(total)}</span>
+                        </td>
+                        {/* Editable pay rate */}
+                        <td className="px-2 py-3 text-center">
+                          <div className="flex items-center justify-center gap-0.5">
+                            <span className="text-xs text-sand-400">$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={payRates[member.name] || ''}
+                              onChange={e => setPayRate(member.name, e.target.value)}
+                              placeholder="0"
+                              className="w-14 text-center text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-300 placeholder-sand-300"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-center text-sm text-emerald-600 font-medium">
+                          {rate > 0 && wk1 > 0 ? `$${wk1cost.toFixed(2)}` : <span className="text-sand-200">–</span>}
+                        </td>
+                        <td className="px-3 py-3 text-center text-sm text-emerald-600 font-medium">
+                          {rate > 0 && wk2 > 0 ? `$${wk2cost.toFixed(2)}` : <span className="text-sand-200">–</span>}
+                        </td>
+                        <td className="px-3 py-3 text-center border-r border-sand-200">
+                          {rate > 0 && total > 0
+                            ? <span className="text-sm font-bold text-emerald-700">${totalCost.toFixed(2)}</span>
+                            : <span className="text-sand-200 text-sm">–</span>}
                         </td>
                         <td className="px-3 py-3 text-center text-sm text-blue-500 font-medium">{leave['Annual Leave'] ? `${leave['Annual Leave']}d` : <span className="text-sand-200">–</span>}</td>
                         <td className="px-3 py-3 text-center text-sm text-amber-500 font-medium">{leave['Sick Leave'] ? `${leave['Sick Leave']}d` : <span className="text-sand-200">–</span>}</td>
@@ -843,13 +891,27 @@ export default function TeamHoursPage() {
                     )
                   })}
                   {/* Totals row */}
-                  <tr className="bg-sand-50 border-t-2 border-sand-200">
-                    <td className="px-5 py-2.5 text-xs font-bold text-sand-500 uppercase tracking-wide">Total</td>
-                    <td className="px-3 py-2.5 text-center text-sm font-bold text-sand-700">{fmtNum(members.reduce((s, m) => s + memberWeekTotal(m.name, week1), 0))}</td>
-                    <td className="px-3 py-2.5 text-center text-sm font-bold text-sand-700">{fmtNum(members.reduce((s, m) => s + memberWeekTotal(m.name, week2), 0))}</td>
-                    <td className="px-3 py-2.5 text-center text-sm font-bold text-blush-600">{fmtNum(grandTotal())}</td>
-                    <td colSpan={4} />
-                  </tr>
+                  {(() => {
+                    const totalCost = members.reduce((s, m) => s + memberTotal(m.name) * getRate(m.name), 0)
+                    const wk1cost   = members.reduce((s, m) => s + memberWeekTotal(m.name, week1) * getRate(m.name), 0)
+                    const wk2cost   = members.reduce((s, m) => s + memberWeekTotal(m.name, week2) * getRate(m.name), 0)
+                    const hasRates  = members.some(m => getRate(m.name) > 0)
+                    return (
+                      <tr className="bg-sand-50 border-t-2 border-sand-200">
+                        <td className="px-5 py-2.5 text-xs font-bold text-sand-500 uppercase tracking-wide">Total</td>
+                        <td className="px-3 py-2.5 text-center text-sm font-bold text-sand-700">{fmtNum(members.reduce((s, m) => s + memberWeekTotal(m.name, week1), 0))}</td>
+                        <td className="px-3 py-2.5 text-center text-sm font-bold text-sand-700">{fmtNum(members.reduce((s, m) => s + memberWeekTotal(m.name, week2), 0))}</td>
+                        <td className="px-3 py-2.5 text-center text-sm font-bold text-blush-600">{fmtNum(grandTotal())}</td>
+                        <td />
+                        <td className="px-3 py-2.5 text-center text-sm font-bold text-emerald-700">{hasRates && wk1cost > 0 ? `$${wk1cost.toFixed(2)}` : ''}</td>
+                        <td className="px-3 py-2.5 text-center text-sm font-bold text-emerald-700">{hasRates && wk2cost > 0 ? `$${wk2cost.toFixed(2)}` : ''}</td>
+                        <td className="px-3 py-2.5 text-center border-r border-sand-200">
+                          {hasRates && totalCost > 0 && <span className="text-sm font-bold text-emerald-700">${totalCost.toFixed(2)}</span>}
+                        </td>
+                        <td colSpan={4} />
+                      </tr>
+                    )
+                  })()}
                 </tbody>
               </table>
             </div>
