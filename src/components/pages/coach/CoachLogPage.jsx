@@ -124,20 +124,27 @@ export default function CoachLogPage() {
       const day = DAY_KEYS.find(d => dayISO(d) === log.date)
       if (!day) return
 
-      // Restore clients — handle both new {client, duration, unit} and old {client, duration: "1hr"}
+      // Restore clients — handle both clean numbers and old embedded "45min" strings
       const clients = (log.private_sessions || []).map(c => {
-        if (c.unit) return c                          // already has unit
-        const parsed = parseDurationStr(c.duration)
-        return { client: c.client || '', ...parsed }
+        const s = String(c.duration || '')
+        if (/[a-z]/i.test(s)) {
+          // embedded unit like "45min" or "2hr" — parse it out
+          const parsed = parseDurationStr(s)
+          return { client: c.client || '', duration: parsed.duration, unit: parsed.unit }
+        }
+        return { client: c.client || '', duration: s, unit: c.unit || 'min' }
       })
 
       // Restore admin tasks
       let adminTasks = []
       if (log.admin_sessions?.length) {
         adminTasks = log.admin_sessions.map(t => {
-          if (t.unit) return t
-          const parsed = parseDurationStr(t.duration)
-          return { task: t.task || '', ...parsed }
+          const s = String(t.duration || '')
+          if (/[a-z]/i.test(s)) {
+            const parsed = parseDurationStr(s)
+            return { task: t.task || '', duration: parsed.duration, unit: parsed.unit }
+          }
+          return { task: t.task || '', duration: s, unit: t.unit || 'min' }
         })
       } else if (parseFloat(log.admin_hours) > 0) {
         // migrate old single admin_hours + notes
@@ -220,13 +227,13 @@ export default function CoachLogPage() {
           sessions:        d.sessions,
           private_sessions: validClients.map(c => ({
             client:   c.client,
-            duration: fmtDuration(c.duration, c.unit || 'min'),
+            duration: c.duration,          // clean number string — no embedded unit
             unit:     c.unit || 'min',
             hours:    toHours(c.duration, c.unit || 'min'),
           })),
           admin_sessions: validAdmin.map(t => ({
             task:     t.task,
-            duration: fmtDuration(t.duration, t.unit || 'min'),
+            duration: t.duration,          // clean number string — no embedded unit
             unit:     t.unit || 'min',
             hours:    toHours(t.duration, t.unit || 'min'),
           })),
