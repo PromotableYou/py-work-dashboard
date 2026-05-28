@@ -57,6 +57,14 @@ function DurationInput({ duration, unit, onDuration, onUnit, placeholder = '0' }
   )
 }
 
+// ─── Hours display ───────────────────────────────────────────────────────────
+// Formats decimal hours without over-rounding: 2.25 → "2.25h", 3.0 → "3h", 4.5 → "4.5h"
+function fmtH(n) {
+  if (!n) return '0h'
+  const s = parseFloat(n.toFixed(2))
+  return `${s}h`
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 function getWeekStart(date = new Date()) {
   const d = new Date(date)
@@ -134,15 +142,27 @@ export default function CoachLogPage() {
       const day = DAY_KEYS.find(d => dayISO(d) === log.date)
       if (!day) return
 
-      // Restore sessions — convert old string format to objects with default 1h
+      // Restore sessions — handles three formats:
+      // 1. Plain string "Evening Q&A" (old format, text[] column)
+      // 2. JSON-stringified object '{"name":"Evening Q&A","duration":"1",...}' (text[] + object save)
+      // 3. Proper JS object {name, duration, unit} (jsonb column)
       const sessions = (log.sessions || []).map(s => {
-        if (typeof s === 'string') return emptySession(s)
-        const durStr = String(s.duration || '')
-        if (/[a-z]/i.test(durStr)) {
-          const parsed = parseDurationStr(durStr)
-          return { name: s.name || s, duration: parsed.duration, unit: parsed.unit }
+        let raw = s
+        if (typeof raw === 'string') {
+          // Try to parse as a JSON-serialised object (happens when DB column is text[])
+          try {
+            const parsed = JSON.parse(raw)
+            if (parsed && typeof parsed === 'object' && parsed.name) raw = parsed
+          } catch {}
         }
-        return { name: s.name || s, duration: durStr, unit: s.unit || 'hr' }
+        if (typeof raw === 'string') return emptySession(raw)  // plain name
+        // raw is an object
+        const durStr = String(raw.duration || '')
+        if (/[a-z]/i.test(durStr)) {
+          const p = parseDurationStr(durStr)
+          return { name: raw.name, duration: p.duration, unit: p.unit }
+        }
+        return { name: raw.name, duration: durStr, unit: raw.unit || 'hr' }
       })
 
       // Restore clients — handle both clean numbers and old embedded "45min" strings
@@ -388,7 +408,7 @@ export default function CoachLogPage() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       {dayTotal > 0 && (
-                        <span className="text-xs font-bold text-sand-700">{dayTotal.toFixed(1)}h</span>
+                        <span className="text-xs font-bold text-sand-700">{fmtH(dayTotal)}</span>
                       )}
                       {(() => {
                         const log = recentLogs.find(l => l.date === iso)
@@ -407,7 +427,7 @@ export default function CoachLogPage() {
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide">Sessions run</p>
-                      {sessionH > 0 && <p className="text-[10px] text-sand-400">{sessionH.toFixed(1)}h</p>}
+                      {sessionH > 0 && <p className="text-[10px] text-sand-400">{fmtH(sessionH)}</p>}
                     </div>
                     <div className="space-y-1 min-h-[24px]">
                       {d.sessions.length === 0 && (
@@ -499,7 +519,7 @@ export default function CoachLogPage() {
                           </div>
                         ))}
                         {clientH > 0 && (
-                          <p className="text-[10px] text-sand-400 text-right pr-7">= {clientH.toFixed(2)}h total</p>
+                          <p className="text-[10px] text-sand-400 text-right pr-7">= {fmtH(clientH)} total</p>
                         )}
                       </div>
                     )}
@@ -537,7 +557,7 @@ export default function CoachLogPage() {
                           </div>
                         ))}
                         {adminH > 0 && (
-                          <p className="text-[10px] text-sand-400 text-right pr-7">= {adminH.toFixed(2)}h total</p>
+                          <p className="text-[10px] text-sand-400 text-right pr-7">= {fmtH(adminH)} total</p>
                         )}
                       </div>
                     )}
@@ -550,7 +570,7 @@ export default function CoachLogPage() {
                         <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide">Total hrs worked</p>
                         {autoTotal > 0 && (
                           <p className="text-[10px] text-sand-400 mt-0.5">
-                            auto: {autoTotal.toFixed(2)}h
+                            auto: {fmtH(autoTotal)}
                             {manualTotal > 0 && manualTotal !== autoTotal && (
                               <button type="button"
                                 onClick={() => setDayData(p => ({ ...p, [day]: { ...p[day], totalHrs: String(autoTotal.toFixed(2)), totalUnit: 'hr' } }))}
@@ -564,11 +584,11 @@ export default function CoachLogPage() {
                         unit={d.totalUnit || 'hr'}
                         onDuration={v => setDayData(p => ({ ...p, [day]: { ...p[day], totalHrs: v } }))}
                         onUnit={v     => setDayData(p => ({ ...p, [day]: { ...p[day], totalUnit: v } }))}
-                        placeholder={autoTotal > 0 ? autoTotal.toFixed(1) : '0'}
+                        placeholder={autoTotal > 0 ? String(autoTotal) : '0'}
                       />
                     </div>
                     {dayTotal > 0 && (
-                      <p className="text-right text-xs font-bold text-sand-900 mt-1">= {dayTotal.toFixed(2)}h</p>
+                      <p className="text-right text-xs font-bold text-sand-900 mt-1">= {fmtH(dayTotal)}</p>
                     )}
                   </div>
 
@@ -600,7 +620,7 @@ export default function CoachLogPage() {
                   <>
                     <div className="text-center">
                       <p className="text-[10px] font-bold text-blush-400 uppercase tracking-wide">Coaching</p>
-                      <p className="text-lg font-bold text-blush-500">{totCoaching.toFixed(1)}h</p>
+                      <p className="text-lg font-bold text-blush-500">{fmtH(totCoaching)}</p>
                     </div>
                     <div className="w-px h-8 bg-sand-200" />
                   </>
@@ -609,14 +629,14 @@ export default function CoachLogPage() {
                   <>
                     <div className="text-center">
                       <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Admin</p>
-                      <p className="text-lg font-bold text-sand-600">{totAdmin.toFixed(1)}h</p>
+                      <p className="text-lg font-bold text-sand-600">{fmtH(totAdmin)}</p>
                     </div>
                     <div className="w-px h-8 bg-sand-200" />
                   </>
                 )}
                 <div className="text-center">
                   <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Total</p>
-                  <p className="text-lg font-bold text-sand-900">{totAll.toFixed(1)}h</p>
+                  <p className="text-lg font-bold text-sand-900">{fmtH(totAll)}</p>
                 </div>
               </div>
             </div>
