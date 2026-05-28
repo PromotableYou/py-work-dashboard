@@ -204,6 +204,8 @@ export default function CoachLogPage() {
         const autoH      = clientH + adminH
         const manualH    = toHours(d.totalHrs, d.totalUnit || 'hr')
         const totalH     = manualH > 0 ? manualH : autoH   // manual overrides auto
+        // coaching = everything that isn't admin (group sessions + 1:1 all count as coaching)
+        const coachingH  = Math.max(0, totalH - adminH)
 
         const hasAnything = totalH > 0 || d.sessions.length > 0 || validClients.length > 0 || validAdmin.length > 0
         if (!hasAnything) continue
@@ -212,7 +214,7 @@ export default function CoachLogPage() {
         const payload = {
           coach_name:      displayName,
           date:            iso,
-          coaching_hours:  clientH,                   // 1:1 hours count as coaching
+          coaching_hours:  coachingH,                 // total minus admin = all coaching time
           admin_hours:     adminH,
           hours:           totalH,
           sessions:        d.sessions,
