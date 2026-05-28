@@ -74,10 +74,20 @@ function formatWeek(monday) {
   return `${monday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${fri.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 }
 
+// ─── 1:1 client type presets ─────────────────────────────────────────────────
+const CLIENT_PRESETS = [
+  { label: 'Clarity Call',   duration: '30', unit: 'min' },
+  { label: 'Resume Review',  duration: '45', unit: 'min' },
+  { label: '1:1 Coaching',   duration: '45', unit: 'min' },
+  { label: 'Custom',         duration: '',   unit: 'min' },
+]
+
 // ─── Day defaults ────────────────────────────────────────────────────────────
-function emptyClient()    { return { client: '', duration: '', unit: 'min' } }
-function emptyAdminTask() { return { task:   '', duration: '', unit: 'min' } }
-function emptyDay()       { return { sessions: [], clients: [], adminTasks: [], totalHrs: '', totalUnit: 'hr' } }
+// Sessions are objects {name, duration, unit} — default 1 hour each
+function emptySession(name) { return { name, duration: '1', unit: 'hr' } }
+function emptyClient()      { return { type: '', client: '', duration: '', unit: 'min' } }
+function emptyAdminTask()   { return { task: '', duration: '', unit: 'min' } }
+function emptyDay()         { return { sessions: [], clients: [], adminTasks: [], totalHrs: '', totalUnit: 'hr' } }
 
 export default function CoachLogPage() {
   const { coachName } = useParams()
@@ -124,15 +134,23 @@ export default function CoachLogPage() {
       const day = DAY_KEYS.find(d => dayISO(d) === log.date)
       if (!day) return
 
+      // Restore sessions — convert old string format to objects with default 1h
+      const sessions = (log.sessions || []).map(s => {
+        if (typeof s === 'string') return emptySession(s)
+        const durStr = String(s.duration || '')
+        if (/[a-z]/i.test(durStr)) {
+          const parsed = parseDurationStr(durStr)
+          return { name: s.name || s, duration: parsed.duration, unit: parsed.unit }
+        }
+        return { name: s.name || s, duration: durStr, unit: s.unit || 'hr' }
+      })
+
       // Restore clients — handle both clean numbers and old embedded "45min" strings
       const clients = (log.private_sessions || []).map(c => {
         const s = String(c.duration || '')
-        if (/[a-z]/i.test(s)) {
-          // embedded unit like "45min" or "2hr" — parse it out
-          const parsed = parseDurationStr(s)
-          return { client: c.client || '', duration: parsed.duration, unit: parsed.unit }
-        }
-        return { client: c.client || '', duration: s, unit: c.unit || 'min' }
+        const duration = /[a-z]/i.test(s) ? parseDurationStr(s).duration : s
+        const unit     = /[a-z]/i.test(s) ? parseDurationStr(s).unit     : (c.unit || 'min')
+        return { type: c.type || '', client: c.client || '', duration, unit }
       })
 
       // Restore admin tasks
@@ -157,7 +175,7 @@ export default function CoachLogPage() {
       const savedHrs = parseFloat(log.hours)
       const totalHrs = !isNaN(savedHrs) && savedHrs > 0 ? String(savedHrs) : ''
 
-      newData[day] = { sessions: log.sessions || [], clients, adminTasks, totalHrs, totalUnit: 'hr' }
+      newData[day] = { sessions, clients, adminTasks, totalHrs, totalUnit: 'hr' }
     })
 
     // Overlay roster for unlogged days
@@ -172,7 +190,8 @@ export default function CoachLogPage() {
             const already = newData[day].adminTasks.some(t => t.task === block.session_type)
             if (!already) newData[day].adminTasks = [...newData[day].adminTasks, { task: block.session_type, duration: '', unit: 'min' }]
           } else {
-            newData[day].sessions = [...new Set([...newData[day].sessions, block.session_type])]
+            const already = newData[day].sessions.some(s => s.name === block.session_type)
+            if (!already) newData[day].sessions = [...newData[day].sessions, emptySession(block.session_type)]
           }
         }
       })
@@ -181,12 +200,31 @@ export default function CoachLogPage() {
   }, [weekISO, recentLogs, loading])
 
   // ─── Day data helpers ─────────────────────────────────────────────────────────
-  function addSession(day, name)   { setDayData(p => ({ ...p, [day]: { ...p[day], sessions: [...p[day].sessions, name] } })); setOpenPicker(null) }
-  function removeSession(day, name){ setDayData(p => ({ ...p, [day]: { ...p[day], sessions: p[day].sessions.filter(s => s !== name) } })) }
+  function addSession(day, name) {
+    setDayData(p => ({ ...p, [day]: { ...p[day], sessions: [...p[day].sessions, emptySession(name)] } }))
+    setOpenPicker(null)
+  }
+  function removeSession(day, name) {
+    setDayData(p => ({ ...p, [day]: { ...p[day], sessions: p[day].sessions.filter(s => s.name !== name) } }))
+  }
+  function updateSession(day, name, field, val) {
+    setDayData(p => ({ ...p, [day]: { ...p[day], sessions: p[day].sessions.map(s => s.name === name ? { ...s, [field]: val } : s) } }))
+  }
 
   function addClient(day)   { setDayData(p => ({ ...p, [day]: { ...p[day], clients: [...p[day].clients, emptyClient()] } })) }
   function updateClient(day, idx, field, val) {
     setDayData(p => ({ ...p, [day]: { ...p[day], clients: p[day].clients.map((c, i) => i === idx ? { ...c, [field]: val } : c) } }))
+  }
+  function applyClientPreset(day, idx, presetLabel) {
+    const preset = CLIENT_PRESETS.find(p => p.label === presetLabel)
+    if (!preset) return
+    setDayData(p => ({
+      ...p, [day]: {
+        ...p[day], clients: p[day].clients.map((c, i) => i === idx
+          ? { ...c, type: presetLabel, client: c.client, duration: preset.duration, unit: preset.unit }
+          : c)
+      }
+    }))
   }
   function removeClient(day, idx) { setDayData(p => ({ ...p, [day]: { ...p[day], clients: p[day].clients.filter((_, i) => i !== idx) } })) }
 
@@ -204,15 +242,15 @@ export default function CoachLogPage() {
     try {
       for (const day of DAY_KEYS) {
         const d          = dayData[day]
-        const validClients = d.clients.filter(c => c.client.trim())
-        const validAdmin   = d.adminTasks.filter(t => t.task.trim())
-        const clientH    = validClients.reduce((s, c) => s + toHours(c.duration, c.unit || 'min'), 0)
-        const adminH     = validAdmin.reduce(  (s, t) => s + toHours(t.duration, t.unit || 'min'), 0)
-        const autoH      = clientH + adminH
+        const validClients  = d.clients.filter(c => c.client.trim())
+        const validAdmin    = d.adminTasks.filter(t => t.task.trim())
+        const sessionH   = d.sessions.reduce(    (s, ses) => s + toHours(ses.duration, ses.unit || 'hr'),  0)
+        const clientH    = validClients.reduce(  (s, c)   => s + toHours(c.duration,   c.unit   || 'min'), 0)
+        const adminH     = validAdmin.reduce(    (s, t)   => s + toHours(t.duration,   t.unit   || 'min'), 0)
+        const autoH      = sessionH + clientH + adminH   // sessions now contribute to auto-total
         const manualH    = toHours(d.totalHrs, d.totalUnit || 'hr')
-        const totalH     = manualH > 0 ? manualH : autoH   // manual overrides auto
-        // coaching = everything that isn't admin (group sessions + 1:1 all count as coaching)
-        const coachingH  = Math.max(0, totalH - adminH)
+        const totalH     = manualH > 0 ? manualH : autoH
+        const coachingH  = Math.max(0, totalH - adminH)  // all non-admin = coaching
 
         const hasAnything = totalH > 0 || d.sessions.length > 0 || validClients.length > 0 || validAdmin.length > 0
         if (!hasAnything) continue
@@ -221,13 +259,15 @@ export default function CoachLogPage() {
         const payload = {
           coach_name:      displayName,
           date:            iso,
-          coaching_hours:  coachingH,                 // total minus admin = all coaching time
+          coaching_hours:  coachingH,
           admin_hours:     adminH,
           hours:           totalH,
-          sessions:        d.sessions,
+          // store sessions as objects so durations survive round-trip
+          sessions:        d.sessions.map(s => ({ name: s.name, duration: s.duration, unit: s.unit || 'hr', hours: toHours(s.duration, s.unit || 'hr') })),
           private_sessions: validClients.map(c => ({
+            type:     c.type || '',
             client:   c.client,
-            duration: c.duration,          // clean number string — no embedded unit
+            duration: c.duration,
             unit:     c.unit || 'min',
             hours:    toHours(c.duration, c.unit || 'min'),
           })),
@@ -326,12 +366,13 @@ export default function CoachLogPage() {
             const date = new Date(iso + 'T12:00:00')
             const isToday  = iso === localISO(new Date())
             const d        = dayData[day]
-            const availableSessions = sessionTypes.filter(st => !d.sessions.includes(st.name))
+            const availableSessions = sessionTypes.filter(st => !d.sessions.some(s => s.name === st.name))
 
             // Live day totals
-            const clientH  = d.clients.reduce(   (s, c) => s + toHours(c.duration, c.unit || 'min'), 0)
-            const adminH   = d.adminTasks.reduce( (s, t) => s + toHours(t.duration, t.unit || 'min'), 0)
-            const autoTotal  = clientH + adminH
+            const sessionH   = d.sessions.reduce(   (s, ses) => s + toHours(ses.duration, ses.unit || 'hr'),  0)
+            const clientH    = d.clients.reduce(    (s, c)   => s + toHours(c.duration,   c.unit   || 'min'), 0)
+            const adminH     = d.adminTasks.reduce( (s, t)   => s + toHours(t.duration,   t.unit   || 'min'), 0)
+            const autoTotal  = sessionH + clientH + adminH
             const manualTotal = toHours(d.totalHrs, d.totalUnit || 'hr')
             const dayTotal  = manualTotal > 0 ? manualTotal : autoTotal
 
@@ -364,22 +405,30 @@ export default function CoachLogPage() {
 
                   {/* Sessions */}
                   <div>
-                    <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide mb-1.5">Sessions run</p>
-                    <div className="flex flex-wrap gap-1 min-h-[24px]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide">Sessions run</p>
+                      {sessionH > 0 && <p className="text-[10px] text-sand-400">{sessionH.toFixed(1)}h</p>}
+                    </div>
+                    <div className="space-y-1 min-h-[24px]">
                       {d.sessions.length === 0 && (
                         <p className="text-xs text-sand-400 italic">None yet</p>
                       )}
-                      {d.sessions.map(name => {
-                        const st = sessionTypes.find(s => s.name === name)
+                      {d.sessions.map(ses => {
+                        const st = sessionTypes.find(s => s.name === ses.name)
                         return (
-                          <span key={name}
-                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-lg leading-none border border-black/10"
-                            style={{ backgroundColor: st?.color || '#e5e7eb', color: '#1a1a1a' }}>
-                            {name}
-                            <button type="button" onClick={() => removeSession(day, name)} className="opacity-60 hover:opacity-100 transition-opacity ml-0.5">
-                              <X className="w-2.5 h-2.5" />
+                          <div key={ses.name} className="flex items-center gap-1.5 rounded-lg px-2 py-1 border border-black/10"
+                            style={{ backgroundColor: st?.color || '#e5e7eb' }}>
+                            <span className="text-xs font-semibold text-black/80 flex-1 min-w-0 truncate">{ses.name}</span>
+                            <DurationInput
+                              duration={ses.duration} unit={ses.unit || 'hr'}
+                              onDuration={v => updateSession(day, ses.name, 'duration', v)}
+                              onUnit={v     => updateSession(day, ses.name, 'unit',     v)}
+                              placeholder="1"
+                            />
+                            <button type="button" onClick={() => removeSession(day, ses.name)} className="opacity-60 hover:opacity-100 transition-opacity shrink-0">
+                              <X className="w-2.5 h-2.5 text-black/60" />
                             </button>
-                          </span>
+                          </div>
                         )
                       })}
                     </div>
@@ -421,19 +470,32 @@ export default function CoachLogPage() {
                     ) : (
                       <div className="space-y-1.5">
                         {d.clients.map((c, idx) => (
-                          <div key={idx} className="flex gap-1 items-center">
-                            <input type="text" value={c.client}
-                              onChange={e => updateClient(day, idx, 'client', e.target.value)}
-                              placeholder="Client name"
-                              className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0" />
-                            <DurationInput
-                              duration={c.duration} unit={c.unit || 'min'}
-                              onDuration={v => updateClient(day, idx, 'duration', v)}
-                              onUnit={v     => updateClient(day, idx, 'unit',     v)}
-                            />
-                            <button type="button" onClick={() => removeClient(day, idx)} className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                          <div key={idx} className="space-y-1">
+                            <div className="flex gap-1 items-center">
+                              {/* Session type dropdown */}
+                              <select
+                                value={c.type || ''}
+                                onChange={e => applyClientPreset(day, idx, e.target.value)}
+                                className="text-xs bg-blush-50 border border-blush-200 rounded-lg px-1.5 py-1.5 text-blush-700 font-semibold focus:outline-none focus:ring-1 focus:ring-blush-400 cursor-pointer shrink-0 max-w-[120px]"
+                              >
+                                <option value="">Type…</option>
+                                {CLIENT_PRESETS.map(p => (
+                                  <option key={p.label} value={p.label}>{p.label}</option>
+                                ))}
+                              </select>
+                              <input type="text" value={c.client}
+                                onChange={e => updateClient(day, idx, 'client', e.target.value)}
+                                placeholder="Client name"
+                                className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0" />
+                              <DurationInput
+                                duration={c.duration} unit={c.unit || 'min'}
+                                onDuration={v => updateClient(day, idx, 'duration', v)}
+                                onUnit={v     => updateClient(day, idx, 'unit',     v)}
+                              />
+                              <button type="button" onClick={() => removeClient(day, idx)} className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         ))}
                         {clientH > 0 && (
@@ -519,8 +581,10 @@ export default function CoachLogPage() {
         {/* ── Weekly total ── */}
         {(() => {
           const totAll = DAY_KEYS.reduce((s, d) => {
-            const adminH = dayData[d].adminTasks.reduce((a, t) => a + toHours(t.duration, t.unit || 'min'), 0)
-            const autoH  = dayData[d].clients.reduce(  (a, c) => a + toHours(c.duration, c.unit || 'min'), 0) + adminH
+            const sesH   = dayData[d].sessions.reduce(   (a, ses) => a + toHours(ses.duration, ses.unit || 'hr'),  0)
+            const cliH   = dayData[d].clients.reduce(    (a, c)   => a + toHours(c.duration,   c.unit   || 'min'), 0)
+            const admH   = dayData[d].adminTasks.reduce( (a, t)   => a + toHours(t.duration,   t.unit   || 'min'), 0)
+            const autoH  = sesH + cliH + admH
             const manual = toHours(dayData[d].totalHrs, dayData[d].totalUnit || 'hr')
             return s + (manual > 0 ? manual : autoH)
           }, 0)

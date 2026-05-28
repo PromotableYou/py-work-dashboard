@@ -239,7 +239,10 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
             const totalCoachingHours = coachPeriodLogs.reduce((s, l) => s + (parseFloat(l.coaching_hours) || 0), 0)
             const totalAdminHours    = coachPeriodLogs.reduce((s, l) => s + (parseFloat(l.admin_hours)    || 0), 0)
             const totalHours = totalCoachingHours + totalAdminHours || coachPeriodLogs.reduce((s, l) => s + (parseFloat(l.hours) || 0), 0)
-            const allSessions = [...new Set(coachPeriodLogs.flatMap(l => l.sessions || []))]
+            // sessions may be strings (old) or objects {name,...} (new)
+          const allSessions = [...new Set(coachPeriodLogs.flatMap(l =>
+            (l.sessions || []).map(s => (typeof s === 'string' ? s : s.name))
+          ))]
             const allClients = coachPeriodLogs.flatMap(l => (l.private_sessions || []).filter(p => p.client))
             const isExpanded = expandedCoach === coach.slug
 
@@ -370,7 +373,8 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
                                     )}
                                     {log.approved && <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">✓ approved</span>}
                                     {log.sessions?.length > 0 && (
-                                      <span className="text-xs text-sand-500 truncate">{log.sessions.join(', ')}</span>
+                                      <span className="text-xs text-sand-500 truncate">
+                                        {log.sessions.map(s => typeof s === 'string' ? s : s.name).join(', ')}</span>
                                     )}
                                   </div>
                                   {log.private_sessions?.some(p => p.client) && (
