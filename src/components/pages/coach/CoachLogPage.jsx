@@ -25,7 +25,7 @@ function formatWeek(monday) {
   return `${monday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${fri.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 }
 function emptyDay() {
-  return { coaching_hours: '', admin_hours: '', sessions: [], clients: [], notes: '' }
+  return { coaching_hours: '', sessions: [], clients: [], adminTasks: [] }
 }
 
 export default function CoachLogPage() {
@@ -74,14 +74,21 @@ export default function CoachLogPage() {
     weekLogs.forEach(log => {
       const day = DAY_KEYS.find(d => dayISO(d) === log.date)
       if (day) {
-        // If log has split hours use them; otherwise try to recover total into coaching slot
-        const hasCoachingHours = log.coaching_hours != null
+        // Recover admin tasks: prefer structured admin_sessions, fall back to old admin_hours+notes
+        let adminTasks = []
+        if (log.admin_sessions?.length) {
+          adminTasks = log.admin_sessions
+        } else if (parseFloat(log.admin_hours) > 0) {
+          // migrate old single-value admin into a task row
+          adminTasks = [{ task: log.notes || 'Admin', duration: String(log.admin_hours) }]
+        } else if (log.notes?.trim()) {
+          adminTasks = [{ task: log.notes.trim(), duration: '' }]
+        }
         newData[day] = {
-          coaching_hours: hasCoachingHours ? String(log.coaching_hours || '') : String(log.hours || ''),
-          admin_hours:    hasCoachingHours ? String(log.admin_hours    || '') : '',
+          coaching_hours: String(log.coaching_hours || log.hours || ''),
           sessions: log.sessions || [],
           clients: log.private_sessions?.length ? log.private_sessions : [],
-          notes: log.notes || '',
+          adminTasks,
         }
       }
     })
@@ -92,10 +99,18 @@ export default function CoachLogPage() {
       mine.forEach(block => {
         if (!block.day || !block.session_type) return
         const day = block.day
-        // Only pre-fill if this day hasn't been logged yet
         const alreadyLogged = weekLogs.some(l => l.date === dayISO(day))
         if (!alreadyLogged && newData[day]) {
-          newData[day].sessions = [...new Set([...newData[day].sessions, block.session_type])]
+          const isAdmin = /admin/i.test(block.session_type)
+          if (isAdmin) {
+            // Add as an admin task row — coach can fill in duration/details
+            const already = newData[day].adminTasks.some(t => t.task === block.session_type)
+            if (!already) {
+              newData[day].adminTasks = [...newData[day].adminTasks, { task: block.session_type, duration: '' }]
+            }
+          } else {
+            newData[day].sessions = [...new Set([...newData[day].sessions, block.session_type])]
+          }
         }
       })
       setDayData({ ...newData })
@@ -125,6 +140,18 @@ export default function CoachLogPage() {
   function removeClient(day, idx) {
     setDayData(p => ({ ...p, [day]: { ...p[day], clients: p[day].clients.filter((_, i) => i !== idx) } }))
   }
+  function addAdminTask(day) {
+    setDayData(p => ({ ...p, [day]: { ...p[day], adminTasks: [...p[day].adminTasks, { task: '', duration: '' }] } }))
+  }
+  function updateAdminTask(day, idx, field, val) {
+    setDayData(p => ({
+      ...p,
+      [day]: { ...p[day], adminTasks: p[day].adminTasks.map((t, i) => i === idx ? { ...t, [field]: val } : t) },
+    }))
+  }
+  function removeAdminTask(day, idx) {
+    setDayData(p => ({ ...p, [day]: { ...p[day], adminTasks: p[day].adminTasks.filter((_, i) => i !== idx) } }))
+  }
 
   // ─── Submit ─────────────────────────────────────────────────────────────────
   async function handleSubmit(e) {
@@ -134,9 +161,10 @@ export default function CoachLogPage() {
     try {
       for (const day of DAY_KEYS) {
         const d = dayData[day]
-        const coachingH = parseFloat(d.coaching_hours) || 0
-        const adminH    = parseFloat(d.admin_hours) || 0
-        const hasAnything = coachingH || adminH || d.sessions.length > 0 || d.clients.some(c => c.client.trim()) || d.notes.trim()
+        const coachingH  = parseFloat(d.coaching_hours) || 0
+        const validAdmin = d.adminTasks.filter(t => t.task.trim())
+        const adminH     = validAdmin.reduce((s, t) => s + (parseFloat(t.duration) || 0), 0)
+        const hasAnything = coachingH || adminH || d.sessions.length > 0 || d.clients.some(c => c.client.trim()) || validAdmin.length > 0
         if (!hasAnything) continue
         const iso = dayISO(day)
         const payload = {
@@ -144,10 +172,11 @@ export default function CoachLogPage() {
           date: iso,
           coaching_hours: coachingH,
           admin_hours: adminH,
-          hours: coachingH + adminH,   // keep total for backward compat
+          hours: coachingH + adminH,
           sessions: d.sessions,
           private_sessions: d.clients.filter(c => c.client.trim()),
-          notes: d.notes.trim(),
+          admin_sessions: validAdmin,
+          notes: validAdmin.map(t => `${t.task}${t.duration ? ` (${t.duration}h)` : ''}`).join(', '),
         }
         // Update if a log already exists for this day, otherwise insert
         const existing = recentLogs.find(l => l.date === iso && l.coach_name === displayName)
@@ -367,19 +396,50 @@ export default function CoachLogPage() {
                     )}
                   </div>
 
-                  {/* Other work / notes */}
+                  {/* Admin tasks */}
                   <div>
-                    <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide mb-1.5">Other work</p>
-                    <textarea
-                      value={d.notes}
-                      onChange={e => setField(day, 'notes', e.target.value)}
-                      placeholder="What else did you work on?"
-                      rows={2}
-                      className="w-full text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none resize-none"
-                    />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide">Admin / Other</p>
+                      <button type="button" onClick={() => addAdminTask(day)} className="text-xs text-blush-600 hover:text-blush-700 font-semibold flex items-center gap-0.5">
+                        <Plus className="w-3 h-3" /> Add
+                      </button>
+                    </div>
+                    {d.adminTasks.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => addAdminTask(day)}
+                        className="text-xs text-sand-500 hover:text-blush-600 font-medium border border-dashed border-sand-300 hover:border-blush-300 rounded-lg px-2 py-1.5 w-full text-center transition-colors"
+                      >
+                        + Log admin work
+                      </button>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {d.adminTasks.map((t, idx) => (
+                          <div key={idx} className="flex gap-1 items-center">
+                            <input
+                              type="text"
+                              value={t.task}
+                              onChange={e => updateAdminTask(day, idx, 'task', e.target.value)}
+                              placeholder="What did you work on?"
+                              className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0"
+                            />
+                            <input
+                              type="text"
+                              value={t.duration}
+                              onChange={e => updateAdminTask(day, idx, 'duration', e.target.value)}
+                              placeholder="1h"
+                              className="w-12 text-xs bg-white border border-sand-300 rounded-lg px-1.5 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
+                            />
+                            <button type="button" onClick={() => removeAdminTask(day, idx)} className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Hours split */}
+                  {/* Coaching hours + totals */}
                   <div className="mt-auto pt-2.5 border-t border-sand-200 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <label className="text-[10px] font-bold text-blush-500 uppercase tracking-wide whitespace-nowrap flex-1">Coaching hrs</label>
@@ -394,27 +454,27 @@ export default function CoachLogPage() {
                         className="w-16 text-sm font-bold text-sand-900 bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-center placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
                       />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-bold text-sand-500 uppercase tracking-wide whitespace-nowrap flex-1">Admin hrs</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        max="24"
-                        value={d.admin_hours}
-                        onChange={e => setField(day, 'admin_hours', e.target.value)}
-                        placeholder="0"
-                        className="w-16 text-sm font-bold text-sand-900 bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-center placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
-                      />
-                    </div>
-                    {(parseFloat(d.coaching_hours) > 0 || parseFloat(d.admin_hours) > 0) && (
-                      <div className="flex items-center justify-between pt-1 border-t border-sand-100">
-                        <span className="text-[10px] text-sand-400 font-semibold uppercase tracking-wide">Total</span>
-                        <span className="text-sm font-bold text-sand-900">
-                          {((parseFloat(d.coaching_hours) || 0) + (parseFloat(d.admin_hours) || 0)).toFixed(1)}h
-                        </span>
-                      </div>
-                    )}
+                    {(() => {
+                      const adminH    = d.adminTasks.reduce((s, t) => s + (parseFloat(t.duration) || 0), 0)
+                      const coachingH = parseFloat(d.coaching_hours) || 0
+                      if (!coachingH && !adminH) return null
+                      return (
+                        <>
+                          {adminH > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-sand-400 uppercase tracking-wide flex-1">Admin total</span>
+                              <span className="text-xs font-semibold text-sand-600 w-16 text-center">{adminH.toFixed(1)}h</span>
+                            </div>
+                          )}
+                          {(coachingH > 0 || adminH > 0) && (
+                            <div className="flex items-center justify-between pt-1 border-t border-sand-100">
+                              <span className="text-[10px] text-sand-400 font-semibold uppercase tracking-wide">Total</span>
+                              <span className="text-sm font-bold text-sand-900">{(coachingH + adminH).toFixed(1)}h</span>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
 
                 </div>
@@ -424,32 +484,40 @@ export default function CoachLogPage() {
         </div>
 
         {/* Weekly total */}
-        {DAY_KEYS.some(d => dayData[d].coaching_hours || dayData[d].admin_hours) && (
-          <div className="mt-4 flex justify-end">
-            <div className="bg-white border border-sand-200 rounded-xl px-5 py-3 flex items-center gap-5">
-              <div className="text-center">
-                <p className="text-[10px] font-bold text-blush-400 uppercase tracking-wide">Coaching</p>
-                <p className="text-lg font-bold text-blush-500">
-                  {DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].coaching_hours) || 0), 0).toFixed(1)}h
-                </p>
-              </div>
-              <div className="w-px h-8 bg-sand-200" />
-              <div className="text-center">
-                <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Admin</p>
-                <p className="text-lg font-bold text-sand-600">
-                  {DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].admin_hours) || 0), 0).toFixed(1)}h
-                </p>
-              </div>
-              <div className="w-px h-8 bg-sand-200" />
-              <div className="text-center">
-                <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Total</p>
-                <p className="text-lg font-bold text-sand-900">
-                  {DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].coaching_hours) || 0) + (parseFloat(dayData[d].admin_hours) || 0), 0).toFixed(1)}h
-                </p>
+        {(() => {
+          const totCoaching = DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].coaching_hours) || 0), 0)
+          const totAdmin    = DAY_KEYS.reduce((s, d) =>
+            s + dayData[d].adminTasks.reduce((a, t) => a + (parseFloat(t.duration) || 0), 0), 0)
+          if (!totCoaching && !totAdmin) return null
+          return (
+            <div className="mt-4 flex justify-end">
+              <div className="bg-white border border-sand-200 rounded-xl px-5 py-3 flex items-center gap-5">
+                {totCoaching > 0 && (
+                  <>
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold text-blush-400 uppercase tracking-wide">Coaching</p>
+                      <p className="text-lg font-bold text-blush-500">{totCoaching.toFixed(1)}h</p>
+                    </div>
+                    <div className="w-px h-8 bg-sand-200" />
+                  </>
+                )}
+                {totAdmin > 0 && (
+                  <>
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Admin</p>
+                      <p className="text-lg font-bold text-sand-600">{totAdmin.toFixed(1)}h</p>
+                    </div>
+                    <div className="w-px h-8 bg-sand-200" />
+                  </>
+                )}
+                <div className="text-center">
+                  <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Total</p>
+                  <p className="text-lg font-bold text-sand-900">{(totCoaching + totAdmin).toFixed(1)}h</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
     </div>
   )

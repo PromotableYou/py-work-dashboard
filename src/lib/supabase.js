@@ -437,20 +437,14 @@ export async function approveCoachLog(logId, { person_name, date, hours, coachin
     }])
   }
 
-  // Write hours into team hours grid (total = coaching + admin, or fallback to hours)
-  const totalHours = (coaching_hours != null && admin_hours != null)
+  // Write total hours into team hours grid (split is stored in wd_coach_logs only)
+  const totalHours = (coaching_hours != null || admin_hours != null)
     ? (parseFloat(coaching_hours) || 0) + (parseFloat(admin_hours) || 0)
     : (hours || 0)
   const { error: e2 } = await supabase
     .from('wd_team_hours')
-    .upsert([{
-      person_name, date,
-      hours: totalHours,
-      coaching_hours: parseFloat(coaching_hours) || 0,
-      admin_hours: parseFloat(admin_hours) || 0,
-      worked: true,
-      type: 'Normal',
-    }], { onConflict: 'person_name,date' })
+    .upsert([{ person_name, date, hours: totalHours, worked: true, type: 'Normal' }],
+      { onConflict: 'person_name,date' })
   if (e2) throw e2
 }
 export async function unapproveCoachLog(logId, { person_name, date }) {

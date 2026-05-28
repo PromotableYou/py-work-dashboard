@@ -374,11 +374,20 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
                                     )}
                                   </div>
                                   {log.private_sessions?.some(p => p.client) && (
-                                    <p className="text-xs text-sand-500">
+                                    <p className="text-xs text-sand-500 mt-0.5">
                                       1:1: {log.private_sessions.filter(p => p.client).map(p => `${p.client}${p.duration ? ` (${p.duration})` : ''}`).join(', ')}
                                     </p>
                                   )}
-                                  {log.notes && (
+                                  {log.admin_sessions?.length > 0 && (
+                                    <div className="mt-1 space-y-0.5">
+                                      {log.admin_sessions.map((t, i) => (
+                                        <p key={i} className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">
+                                          📋 {t.task}{t.duration ? ` · ${t.duration}h` : ''}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {!log.admin_sessions?.length && log.notes && (
                                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 mt-1">
                                       📝 {log.notes}
                                     </p>
