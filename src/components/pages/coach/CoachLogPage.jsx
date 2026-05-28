@@ -5,10 +5,59 @@ import { getSessionTypes, getCoachLogs, addCoachLog, updateCoachLog, getRosterBl
 import { coachBySlug } from '../../../lib/coaches'
 
 const DAY_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri']
-const DAY_LABELS = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday' }
 const DAY_SHORT  = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri' }
 const DAY_OFFSET = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4 }
 
+// ─── Duration helpers ────────────────────────────────────────────────────────
+// Convert a {duration, unit} pair to decimal hours
+function toHours(duration, unit) {
+  const n = parseFloat(duration) || 0
+  return unit === 'min' ? n / 60 : n
+}
+// Format hours as a readable string for storage / display
+function fmtDuration(duration, unit) {
+  if (!duration) return ''
+  return `${duration}${unit}`
+}
+// Parse an old-style duration string back to {duration, unit}
+function parseDurationStr(str) {
+  if (!str) return { duration: '', unit: 'min' }
+  const s = String(str)
+  const minM = s.match(/^([\d.]+)\s*min?$/i)
+  const hrM  = s.match(/^([\d.]+)\s*h(?:rs?|ours?)?$/i)
+  if (minM) return { duration: minM[1], unit: 'min' }
+  if (hrM)  return { duration: hrM[1],  unit: 'hr'  }
+  const n = parseFloat(s)
+  if (!isNaN(n) && n > 0) return { duration: String(n), unit: 'hr' }
+  return { duration: s, unit: 'hr' }
+}
+
+// ─── Duration input ──────────────────────────────────────────────────────────
+function DurationInput({ duration, unit, onDuration, onUnit, placeholder = '0' }) {
+  return (
+    <div className="flex rounded-lg overflow-hidden border border-sand-300 focus-within:ring-1 focus-within:ring-blush-400 focus-within:border-blush-400 shrink-0">
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={duration}
+        onChange={e => onDuration(e.target.value)}
+        placeholder={placeholder}
+        className="w-10 text-xs text-sand-900 placeholder-sand-400 bg-white px-1.5 py-1.5 text-center focus:outline-none"
+      />
+      <select
+        value={unit}
+        onChange={e => onUnit(e.target.value)}
+        className="text-[10px] font-semibold bg-sand-50 text-sand-600 border-l border-sand-300 px-1 py-1.5 focus:outline-none cursor-pointer"
+      >
+        <option value="min">min</option>
+        <option value="hr">hr</option>
+      </select>
+    </div>
+  )
+}
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 function getWeekStart(date = new Date()) {
   const d = new Date(date)
   const day = d.getDay()
@@ -24,36 +73,37 @@ function formatWeek(monday) {
   const fri = addDays(monday, 4)
   return `${monday.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${fri.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 }
-function emptyDay() {
-  return { coaching_hours: '', sessions: [], clients: [], adminTasks: [] }
-}
+
+// ─── Day defaults ────────────────────────────────────────────────────────────
+function emptyClient()    { return { client: '', duration: '', unit: 'min' } }
+function emptyAdminTask() { return { task:   '', duration: '', unit: 'min' } }
+function emptyDay()       { return { sessions: [], clients: [], adminTasks: [] } }
 
 export default function CoachLogPage() {
   const { coachName } = useParams()
   const coach = coachBySlug(coachName || '')
   const displayName = coach?.name || null
 
-  const [sessionTypes, setSessionTypes]   = useState([])
-  const [recentLogs, setRecentLogs]       = useState([])
-  const [loading, setLoading]             = useState(true)
-  const [submitting, setSubmitting]       = useState(false)
-  const [submitted, setSubmitted]         = useState(false)
-  const [error, setError]                 = useState(null)
-  const [openPicker, setOpenPicker]       = useState(null) // which day's session picker is open
+  const [sessionTypes, setSessionTypes] = useState([])
+  const [recentLogs,   setRecentLogs]   = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [submitting,   setSubmitting]   = useState(false)
+  const [submitted,    setSubmitted]    = useState(false)
+  const [error,        setError]        = useState(null)
+  const [openPicker,   setOpenPicker]   = useState(null)
 
   const [weekOffset, setWeekOffset] = useState(0)
-  const weekStart   = addDays(getWeekStart(), weekOffset * 7)
-  const weekISO     = localISO(weekStart)
-  const isThisWeek  = weekOffset === 0
+  const weekStart  = addDays(getWeekStart(), weekOffset * 7)
+  const weekISO    = localISO(weekStart)
+  const isThisWeek = weekOffset === 0
 
   const dayISO = (day) => localISO(addDays(weekStart, DAY_OFFSET[day]))
 
-  // Per-day state: { mon: { hours, sessions[], clients[] }, ... }
   const [dayData, setDayData] = useState(() =>
     Object.fromEntries(DAY_KEYS.map(d => [d, emptyDay()]))
   )
 
-  // Load session types + all logs on mount
+  // ─── Load ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!displayName) { setLoading(false); return }
     Promise.all([getSessionTypes(), getCoachLogs(displayName)])
@@ -62,38 +112,44 @@ export default function CoachLogPage() {
       .finally(() => setLoading(false))
   }, [displayName])
 
-  // When week changes: pre-fill from existing logs, then overlay roster for unlogged days
+  // ─── Week pre-fill ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!displayName || loading) return
 
     const newData = Object.fromEntries(DAY_KEYS.map(d => [d, emptyDay()]))
-
-    // Fill in any already-saved logs for this week
-    const weekEnd = localISO(addDays(weekStart, 4))
+    const weekEnd  = localISO(addDays(weekStart, 4))
     const weekLogs = recentLogs.filter(l => l.date >= weekISO && l.date <= weekEnd)
+
     weekLogs.forEach(log => {
       const day = DAY_KEYS.find(d => dayISO(d) === log.date)
-      if (day) {
-        // Recover admin tasks: prefer structured admin_sessions, fall back to old admin_hours+notes
-        let adminTasks = []
-        if (log.admin_sessions?.length) {
-          adminTasks = log.admin_sessions
-        } else if (parseFloat(log.admin_hours) > 0) {
-          // migrate old single-value admin into a task row
-          adminTasks = [{ task: log.notes || 'Admin', duration: String(log.admin_hours) }]
-        } else if (log.notes?.trim()) {
-          adminTasks = [{ task: log.notes.trim(), duration: '' }]
-        }
-        newData[day] = {
-          coaching_hours: String(log.coaching_hours || log.hours || ''),
-          sessions: log.sessions || [],
-          clients: log.private_sessions?.length ? log.private_sessions : [],
-          adminTasks,
-        }
+      if (!day) return
+
+      // Restore clients — handle both new {client, duration, unit} and old {client, duration: "1hr"}
+      const clients = (log.private_sessions || []).map(c => {
+        if (c.unit) return c                          // already has unit
+        const parsed = parseDurationStr(c.duration)
+        return { client: c.client || '', ...parsed }
+      })
+
+      // Restore admin tasks
+      let adminTasks = []
+      if (log.admin_sessions?.length) {
+        adminTasks = log.admin_sessions.map(t => {
+          if (t.unit) return t
+          const parsed = parseDurationStr(t.duration)
+          return { task: t.task || '', ...parsed }
+        })
+      } else if (parseFloat(log.admin_hours) > 0) {
+        // migrate old single admin_hours + notes
+        adminTasks = [{ task: log.notes || 'Admin', ...parseDurationStr(String(log.admin_hours)) }]
+      } else if (log.notes?.trim()) {
+        adminTasks = [{ task: log.notes.trim(), duration: '', unit: 'min' }]
       }
+
+      newData[day] = { sessions: log.sessions || [], clients, adminTasks }
     })
 
-    // Fetch roster and fill unlogged days from it
+    // Overlay roster for unlogged days
     getRosterBlocks(weekISO).then(blocks => {
       const mine = blocks.filter(b => b.coach_name === displayName)
       mine.forEach(block => {
@@ -101,13 +157,9 @@ export default function CoachLogPage() {
         const day = block.day
         const alreadyLogged = weekLogs.some(l => l.date === dayISO(day))
         if (!alreadyLogged && newData[day]) {
-          const isAdmin = /admin/i.test(block.session_type)
-          if (isAdmin) {
-            // Add as an admin task row — coach can fill in duration/details
+          if (/admin/i.test(block.session_type)) {
             const already = newData[day].adminTasks.some(t => t.task === block.session_type)
-            if (!already) {
-              newData[day].adminTasks = [...newData[day].adminTasks, { task: block.session_type, duration: '' }]
-            }
+            if (!already) newData[day].adminTasks = [...newData[day].adminTasks, { task: block.session_type, duration: '', unit: 'min' }]
           } else {
             newData[day].sessions = [...new Set([...newData[day].sessions, block.session_type])]
           }
@@ -117,87 +169,78 @@ export default function CoachLogPage() {
     }).catch(() => setDayData({ ...newData }))
   }, [weekISO, recentLogs, loading])
 
-  // ─── Day data helpers ───────────────────────────────────────────────────────
-  function setField(day, field, value) {
-    setDayData(p => ({ ...p, [day]: { ...p[day], [field]: value } }))
-  }
-  function addSession(day, name) {
-    setDayData(p => ({ ...p, [day]: { ...p[day], sessions: [...p[day].sessions, name] } }))
-    setOpenPicker(null)
-  }
-  function removeSession(day, name) {
-    setDayData(p => ({ ...p, [day]: { ...p[day], sessions: p[day].sessions.filter(s => s !== name) } }))
-  }
-  function addClient(day) {
-    setDayData(p => ({ ...p, [day]: { ...p[day], clients: [...p[day].clients, { client: '', duration: '' }] } }))
-  }
-  function updateClient(day, idx, field, val) {
-    setDayData(p => ({
-      ...p,
-      [day]: { ...p[day], clients: p[day].clients.map((c, i) => i === idx ? { ...c, [field]: val } : c) },
-    }))
-  }
-  function removeClient(day, idx) {
-    setDayData(p => ({ ...p, [day]: { ...p[day], clients: p[day].clients.filter((_, i) => i !== idx) } }))
-  }
-  function addAdminTask(day) {
-    setDayData(p => ({ ...p, [day]: { ...p[day], adminTasks: [...p[day].adminTasks, { task: '', duration: '' }] } }))
-  }
-  function updateAdminTask(day, idx, field, val) {
-    setDayData(p => ({
-      ...p,
-      [day]: { ...p[day], adminTasks: p[day].adminTasks.map((t, i) => i === idx ? { ...t, [field]: val } : t) },
-    }))
-  }
-  function removeAdminTask(day, idx) {
-    setDayData(p => ({ ...p, [day]: { ...p[day], adminTasks: p[day].adminTasks.filter((_, i) => i !== idx) } }))
-  }
+  // ─── Day data helpers ─────────────────────────────────────────────────────────
+  function addSession(day, name)   { setDayData(p => ({ ...p, [day]: { ...p[day], sessions: [...p[day].sessions, name] } })); setOpenPicker(null) }
+  function removeSession(day, name){ setDayData(p => ({ ...p, [day]: { ...p[day], sessions: p[day].sessions.filter(s => s !== name) } })) }
 
-  // ─── Submit ─────────────────────────────────────────────────────────────────
+  function addClient(day)   { setDayData(p => ({ ...p, [day]: { ...p[day], clients: [...p[day].clients, emptyClient()] } })) }
+  function updateClient(day, idx, field, val) {
+    setDayData(p => ({ ...p, [day]: { ...p[day], clients: p[day].clients.map((c, i) => i === idx ? { ...c, [field]: val } : c) } }))
+  }
+  function removeClient(day, idx) { setDayData(p => ({ ...p, [day]: { ...p[day], clients: p[day].clients.filter((_, i) => i !== idx) } })) }
+
+  function addAdminTask(day)   { setDayData(p => ({ ...p, [day]: { ...p[day], adminTasks: [...p[day].adminTasks, emptyAdminTask()] } })) }
+  function updateAdminTask(day, idx, field, val) {
+    setDayData(p => ({ ...p, [day]: { ...p[day], adminTasks: p[day].adminTasks.map((t, i) => i === idx ? { ...t, [field]: val } : t) } }))
+  }
+  function removeAdminTask(day, idx) { setDayData(p => ({ ...p, [day]: { ...p[day], adminTasks: p[day].adminTasks.filter((_, i) => i !== idx) } })) }
+
+  // ─── Submit ───────────────────────────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
     try {
       for (const day of DAY_KEYS) {
-        const d = dayData[day]
-        const coachingH  = parseFloat(d.coaching_hours) || 0
-        const validAdmin = d.adminTasks.filter(t => t.task.trim())
-        const adminH     = validAdmin.reduce((s, t) => s + (parseFloat(t.duration) || 0), 0)
-        const hasAnything = coachingH || adminH || d.sessions.length > 0 || d.clients.some(c => c.client.trim()) || validAdmin.length > 0
+        const d          = dayData[day]
+        const validClients = d.clients.filter(c => c.client.trim())
+        const validAdmin   = d.adminTasks.filter(t => t.task.trim())
+        const clientH    = validClients.reduce((s, c) => s + toHours(c.duration, c.unit || 'min'), 0)
+        const adminH     = validAdmin.reduce(  (s, t) => s + toHours(t.duration, t.unit || 'min'), 0)
+        const totalH     = clientH + adminH
+
+        const hasAnything = totalH > 0 || d.sessions.length > 0 || validClients.length > 0 || validAdmin.length > 0
         if (!hasAnything) continue
+
         const iso = dayISO(day)
         const payload = {
-          coach_name: displayName,
-          date: iso,
-          coaching_hours: coachingH,
-          admin_hours: adminH,
-          hours: coachingH + adminH,
-          sessions: d.sessions,
-          private_sessions: d.clients.filter(c => c.client.trim()),
-          admin_sessions: validAdmin,
-          notes: validAdmin.map(t => `${t.task}${t.duration ? ` (${t.duration}h)` : ''}`).join(', '),
+          coach_name:      displayName,
+          date:            iso,
+          coaching_hours:  clientH,                   // 1:1 hours count as coaching
+          admin_hours:     adminH,
+          hours:           totalH,
+          sessions:        d.sessions,
+          private_sessions: validClients.map(c => ({
+            client:   c.client,
+            duration: fmtDuration(c.duration, c.unit || 'min'),
+            unit:     c.unit || 'min',
+            hours:    toHours(c.duration, c.unit || 'min'),
+          })),
+          admin_sessions: validAdmin.map(t => ({
+            task:     t.task,
+            duration: fmtDuration(t.duration, t.unit || 'min'),
+            unit:     t.unit || 'min',
+            hours:    toHours(t.duration, t.unit || 'min'),
+          })),
+          notes: validAdmin.map(t => `${t.task}${t.duration ? ` (${fmtDuration(t.duration, t.unit || 'min')})` : ''}`).join(', '),
         }
-        // Update if a log already exists for this day, otherwise insert
+
         const existing = recentLogs.find(l => l.date === iso && l.coach_name === displayName)
-        if (existing) {
-          await updateCoachLog(existing.id, payload)
-        } else {
-          await addCoachLog(payload)
-        }
+        if (existing) await updateCoachLog(existing.id, payload)
+        else          await addCoachLog(payload)
       }
       setSubmitted(true)
       const logs = await getCoachLogs(displayName)
       setRecentLogs(logs)
       setTimeout(() => setSubmitted(false), 3000)
-    } catch (e) {
-      setError(e.message)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const weekEnd = localISO(addDays(weekStart, 4))
+  const weekEnd   = localISO(addDays(weekStart, 4))
   const loggedDays = new Set(
     recentLogs.filter(l => l.date >= weekISO && l.date <= weekEnd).map(l => l.date)
   )
@@ -207,7 +250,6 @@ export default function CoachLogPage() {
       <div className="w-5 h-5 border-2 border-blush-400 border-t-transparent rounded-full animate-spin" />
     </div>
   )
-
   if (!displayName) return (
     <div className="min-h-screen bg-sand-50 flex items-center justify-center">
       <div className="text-center"><p className="text-2xl mb-2">🤔</p><p className="text-sand-500">This link doesn't exist.</p></div>
@@ -217,7 +259,7 @@ export default function CoachLogPage() {
   return (
     <div className="min-h-screen bg-sand-50" onClick={() => setOpenPicker(null)}>
 
-      {/* Top bar */}
+      {/* ── Top bar ── */}
       <div className="bg-white border-b border-sand-200 px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-blush-400 flex items-center justify-center text-white font-bold text-sm">
@@ -241,7 +283,8 @@ export default function CoachLogPage() {
               {loggedDays.size > 0 && <span className="text-emerald-500 font-medium"> · {loggedDays.size} day{loggedDays.size !== 1 ? 's' : ''} logged</span>}
             </p>
           </div>
-          <button type="button" onClick={() => setWeekOffset(o => Math.min(o + 1, 0))} disabled={isThisWeek} className="p-1 rounded hover:bg-sand-200 text-sand-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+          <button type="button" onClick={() => setWeekOffset(o => Math.min(o + 1, 0))} disabled={isThisWeek}
+            className="p-1 rounded hover:bg-sand-200 text-sand-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -253,26 +296,27 @@ export default function CoachLogPage() {
             </div>
           )}
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="bg-blush-500 hover:bg-blush-600 disabled:opacity-60 text-white font-semibold px-5 py-2 rounded-xl transition-colors text-sm"
-          >
+          <button onClick={handleSubmit} disabled={submitting}
+            className="bg-blush-500 hover:bg-blush-600 disabled:opacity-60 text-white font-semibold px-5 py-2 rounded-xl transition-colors text-sm">
             {submitting ? 'Saving…' : 'Save Week'}
           </button>
         </div>
       </div>
 
-      {/* Day columns */}
+      {/* ── Day columns ── */}
       <div className="px-6 py-6">
         <div className="grid grid-cols-5 gap-4">
           {DAY_KEYS.map(day => {
-            const iso = dayISO(day)
+            const iso  = dayISO(day)
             const date = new Date(iso + 'T12:00:00')
-            const isToday = iso === localISO(new Date())
-            const isLogged = loggedDays.has(iso)
-            const d = dayData[day]
+            const isToday  = iso === localISO(new Date())
+            const d        = dayData[day]
             const availableSessions = sessionTypes.filter(st => !d.sessions.includes(st.name))
+
+            // Live day total
+            const clientH  = d.clients.reduce(   (s, c) => s + toHours(c.duration, c.unit || 'min'), 0)
+            const adminH   = d.adminTasks.reduce( (s, t) => s + toHours(t.duration, t.unit || 'min'), 0)
+            const dayTotal = clientH + adminH
 
             return (
               <div key={day} className={`bg-white border rounded-2xl flex flex-col overflow-hidden ${isToday ? 'border-blush-300 ring-2 ring-blush-100' : 'border-sand-200'}`}>
@@ -284,13 +328,18 @@ export default function CoachLogPage() {
                       <p className={`text-sm font-bold ${isToday ? 'text-blush-600' : 'text-sand-800'}`}>{DAY_SHORT[day]}</p>
                       <p className="text-xs text-sand-400">{date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</p>
                     </div>
-                    {(() => {
-                      const log = recentLogs.find(l => l.date === iso)
-                      if (!log) return null
-                      return log.approved
-                        ? <span className="text-emerald-600 text-xs font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">✓ approved</span>
-                        : <span className="text-amber-600 text-xs font-semibold">saved</span>
-                    })()}
+                    <div className="flex items-center gap-1.5">
+                      {dayTotal > 0 && (
+                        <span className="text-xs font-bold text-sand-700">{dayTotal.toFixed(1)}h</span>
+                      )}
+                      {(() => {
+                        const log = recentLogs.find(l => l.date === iso)
+                        if (!log) return null
+                        return log.approved
+                          ? <span className="text-emerald-600 text-xs font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">✓</span>
+                          : <span className="text-amber-500 text-xs font-semibold">saved</span>
+                      })()}
+                    </div>
                   </div>
                 </div>
 
@@ -298,51 +347,37 @@ export default function CoachLogPage() {
 
                   {/* Sessions */}
                   <div>
-                    <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide mb-1.5">Sessions</p>
-                    <div className="flex flex-wrap gap-1 min-h-[28px]">
+                    <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide mb-1.5">Sessions run</p>
+                    <div className="flex flex-wrap gap-1 min-h-[24px]">
                       {d.sessions.length === 0 && (
                         <p className="text-xs text-sand-400 italic">None yet</p>
                       )}
                       {d.sessions.map(name => {
                         const st = sessionTypes.find(s => s.name === name)
                         return (
-                          <span
-                            key={name}
-                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg leading-none border border-black/10"
-                            style={{ backgroundColor: st?.color || '#e5e7eb', color: '#1a1a1a' }}
-                          >
+                          <span key={name}
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-lg leading-none border border-black/10"
+                            style={{ backgroundColor: st?.color || '#e5e7eb', color: '#1a1a1a' }}>
                             {name}
-                            <button
-                              type="button"
-                              onClick={() => removeSession(day, name)}
-                              className="opacity-60 hover:opacity-100 transition-opacity ml-0.5"
-                            >
+                            <button type="button" onClick={() => removeSession(day, name)} className="opacity-60 hover:opacity-100 transition-opacity ml-0.5">
                               <X className="w-2.5 h-2.5" />
                             </button>
                           </span>
                         )
                       })}
                     </div>
-
-                    {/* Add session picker */}
                     {availableSessions.length > 0 && (
-                      <div className="relative mt-2" onClick={e => e.stopPropagation()}>
-                        <button
-                          type="button"
+                      <div className="relative mt-1.5" onClick={e => e.stopPropagation()}>
+                        <button type="button"
                           onClick={() => setOpenPicker(openPicker === day ? null : day)}
-                          className="flex items-center gap-1 text-xs text-blush-600 hover:text-blush-700 font-semibold border border-blush-200 bg-blush-50 hover:bg-blush-100 px-2 py-1 rounded-lg transition-colors"
-                        >
+                          className="flex items-center gap-1 text-xs text-blush-600 hover:text-blush-700 font-semibold border border-blush-200 bg-blush-50 hover:bg-blush-100 px-2 py-1 rounded-lg transition-colors">
                           <Plus className="w-3 h-3" /> Add session
                         </button>
                         {openPicker === day && (
                           <div className="absolute z-20 top-full left-0 mt-1 bg-white border border-sand-300 rounded-xl shadow-lg py-1 min-w-[190px] max-h-52 overflow-y-auto">
                             {availableSessions.map(st => (
-                              <button
-                                key={st.id}
-                                type="button"
-                                onClick={() => addSession(day, st.name)}
-                                className="w-full text-left text-xs px-3 py-2 hover:bg-sand-50 transition-colors flex items-center gap-2 text-sand-800 font-medium"
-                              >
+                              <button key={st.id} type="button" onClick={() => addSession(day, st.name)}
+                                className="w-full text-left text-xs px-3 py-2 hover:bg-sand-50 transition-colors flex items-center gap-2 text-sand-800 font-medium">
                                 <span className="w-3 h-3 rounded shrink-0 border border-black/10" style={{ backgroundColor: st.color || '#e5e7eb' }} />
                                 {st.name}
                               </button>
@@ -353,7 +388,7 @@ export default function CoachLogPage() {
                     )}
                   </div>
 
-                  {/* 1:1 clients */}
+                  {/* 1:1 Clients */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide">1:1 Clients</p>
@@ -362,41 +397,36 @@ export default function CoachLogPage() {
                       </button>
                     </div>
                     {d.clients.length === 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => addClient(day)}
-                        className="text-xs text-sand-500 hover:text-blush-600 font-medium border border-dashed border-sand-300 hover:border-blush-300 rounded-lg px-2 py-1.5 w-full text-center transition-colors"
-                      >
+                      <button type="button" onClick={() => addClient(day)}
+                        className="text-xs text-sand-500 hover:text-blush-600 font-medium border border-dashed border-sand-300 hover:border-blush-300 rounded-lg px-2 py-1.5 w-full text-center transition-colors">
                         + Add client
                       </button>
                     ) : (
                       <div className="space-y-1.5">
                         {d.clients.map((c, idx) => (
                           <div key={idx} className="flex gap-1 items-center">
-                            <input
-                              type="text"
-                              value={c.client}
+                            <input type="text" value={c.client}
                               onChange={e => updateClient(day, idx, 'client', e.target.value)}
                               placeholder="Client name"
-                              className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0"
-                            />
-                            <input
-                              type="text"
-                              value={c.duration}
-                              onChange={e => updateClient(day, idx, 'duration', e.target.value)}
-                              placeholder="1hr"
-                              className="w-12 text-xs bg-white border border-sand-300 rounded-lg px-1.5 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
+                              className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0" />
+                            <DurationInput
+                              duration={c.duration} unit={c.unit || 'min'}
+                              onDuration={v => updateClient(day, idx, 'duration', v)}
+                              onUnit={v     => updateClient(day, idx, 'unit',     v)}
                             />
                             <button type="button" onClick={() => removeClient(day, idx)} className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ))}
+                        {clientH > 0 && (
+                          <p className="text-[10px] text-sand-400 text-right pr-7">= {clientH.toFixed(2)}h total</p>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  {/* Admin tasks */}
+                  {/* Admin / Other */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide">Admin / Other</p>
@@ -405,77 +435,42 @@ export default function CoachLogPage() {
                       </button>
                     </div>
                     {d.adminTasks.length === 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => addAdminTask(day)}
-                        className="text-xs text-sand-500 hover:text-blush-600 font-medium border border-dashed border-sand-300 hover:border-blush-300 rounded-lg px-2 py-1.5 w-full text-center transition-colors"
-                      >
+                      <button type="button" onClick={() => addAdminTask(day)}
+                        className="text-xs text-sand-500 hover:text-blush-600 font-medium border border-dashed border-sand-300 hover:border-blush-300 rounded-lg px-2 py-1.5 w-full text-center transition-colors">
                         + Log admin work
                       </button>
                     ) : (
                       <div className="space-y-1.5">
                         {d.adminTasks.map((t, idx) => (
                           <div key={idx} className="flex gap-1 items-center">
-                            <input
-                              type="text"
-                              value={t.task}
+                            <input type="text" value={t.task}
                               onChange={e => updateAdminTask(day, idx, 'task', e.target.value)}
                               placeholder="What did you work on?"
-                              className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0"
-                            />
-                            <input
-                              type="text"
-                              value={t.duration}
-                              onChange={e => updateAdminTask(day, idx, 'duration', e.target.value)}
-                              placeholder="1h"
-                              className="w-12 text-xs bg-white border border-sand-300 rounded-lg px-1.5 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
+                              className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0" />
+                            <DurationInput
+                              duration={t.duration} unit={t.unit || 'min'}
+                              onDuration={v => updateAdminTask(day, idx, 'duration', v)}
+                              onUnit={v     => updateAdminTask(day, idx, 'unit',     v)}
                             />
                             <button type="button" onClick={() => removeAdminTask(day, idx)} className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ))}
+                        {adminH > 0 && (
+                          <p className="text-[10px] text-sand-400 text-right pr-7">= {adminH.toFixed(2)}h total</p>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  {/* Coaching hours + totals */}
-                  <div className="mt-auto pt-2.5 border-t border-sand-200 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-bold text-blush-500 uppercase tracking-wide whitespace-nowrap flex-1">Coaching hrs</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        max="24"
-                        value={d.coaching_hours}
-                        onChange={e => setField(day, 'coaching_hours', e.target.value)}
-                        placeholder="0"
-                        className="w-16 text-sm font-bold text-sand-900 bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-center placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
-                      />
+                  {/* Day total (auto-computed) */}
+                  {dayTotal > 0 && (
+                    <div className="mt-auto pt-2.5 border-t border-sand-100 flex items-center justify-between">
+                      <span className="text-[10px] text-sand-400 font-semibold uppercase tracking-wide">Day total</span>
+                      <span className="text-sm font-bold text-sand-900">{dayTotal.toFixed(2)}h</span>
                     </div>
-                    {(() => {
-                      const adminH    = d.adminTasks.reduce((s, t) => s + (parseFloat(t.duration) || 0), 0)
-                      const coachingH = parseFloat(d.coaching_hours) || 0
-                      if (!coachingH && !adminH) return null
-                      return (
-                        <>
-                          {adminH > 0 && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-sand-400 uppercase tracking-wide flex-1">Admin total</span>
-                              <span className="text-xs font-semibold text-sand-600 w-16 text-center">{adminH.toFixed(1)}h</span>
-                            </div>
-                          )}
-                          {(coachingH > 0 || adminH > 0) && (
-                            <div className="flex items-center justify-between pt-1 border-t border-sand-100">
-                              <span className="text-[10px] text-sand-400 font-semibold uppercase tracking-wide">Total</span>
-                              <span className="text-sm font-bold text-sand-900">{(coachingH + adminH).toFixed(1)}h</span>
-                            </div>
-                          )}
-                        </>
-                      )
-                    })()}
-                  </div>
+                  )}
 
                 </div>
               </div>
@@ -483,20 +478,22 @@ export default function CoachLogPage() {
           })}
         </div>
 
-        {/* Weekly total */}
+        {/* ── Weekly total ── */}
         {(() => {
-          const totCoaching = DAY_KEYS.reduce((s, d) => s + (parseFloat(dayData[d].coaching_hours) || 0), 0)
-          const totAdmin    = DAY_KEYS.reduce((s, d) =>
-            s + dayData[d].adminTasks.reduce((a, t) => a + (parseFloat(t.duration) || 0), 0), 0)
-          if (!totCoaching && !totAdmin) return null
+          const totClient = DAY_KEYS.reduce((s, d) =>
+            s + dayData[d].clients.reduce((a, c) => a + toHours(c.duration, c.unit || 'min'), 0), 0)
+          const totAdmin  = DAY_KEYS.reduce((s, d) =>
+            s + dayData[d].adminTasks.reduce((a, t) => a + toHours(t.duration, t.unit || 'min'), 0), 0)
+          const totAll    = totClient + totAdmin
+          if (!totAll) return null
           return (
             <div className="mt-4 flex justify-end">
               <div className="bg-white border border-sand-200 rounded-xl px-5 py-3 flex items-center gap-5">
-                {totCoaching > 0 && (
+                {totClient > 0 && (
                   <>
                     <div className="text-center">
                       <p className="text-[10px] font-bold text-blush-400 uppercase tracking-wide">Coaching</p>
-                      <p className="text-lg font-bold text-blush-500">{totCoaching.toFixed(1)}h</p>
+                      <p className="text-lg font-bold text-blush-500">{totClient.toFixed(1)}h</p>
                     </div>
                     <div className="w-px h-8 bg-sand-200" />
                   </>
@@ -512,7 +509,7 @@ export default function CoachLogPage() {
                 )}
                 <div className="text-center">
                   <p className="text-[10px] font-bold text-sand-400 uppercase tracking-wide">Total</p>
-                  <p className="text-lg font-bold text-sand-900">{(totCoaching + totAdmin).toFixed(1)}h</p>
+                  <p className="text-lg font-bold text-sand-900">{totAll.toFixed(1)}h</p>
                 </div>
               </div>
             </div>
