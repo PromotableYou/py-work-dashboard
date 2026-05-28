@@ -511,25 +511,25 @@ export default function CoachLogPage() {
 
         {/* ── Weekly total ── */}
         {(() => {
-          const totClient = DAY_KEYS.reduce((s, d) =>
-            s + dayData[d].clients.reduce((a, c) => a + toHours(c.duration, c.unit || 'min'), 0), 0)
-          const totAdmin  = DAY_KEYS.reduce((s, d) =>
-            s + dayData[d].adminTasks.reduce((a, t) => a + toHours(t.duration, t.unit || 'min'), 0), 0)
-          const totAll    = DAY_KEYS.reduce((s, d) => {
-            const auto   = dayData[d].clients.reduce((a, c) => a + toHours(c.duration, c.unit || 'min'), 0)
-                         + dayData[d].adminTasks.reduce((a, t) => a + toHours(t.duration, t.unit || 'min'), 0)
+          const totAll = DAY_KEYS.reduce((s, d) => {
+            const adminH = dayData[d].adminTasks.reduce((a, t) => a + toHours(t.duration, t.unit || 'min'), 0)
+            const autoH  = dayData[d].clients.reduce(  (a, c) => a + toHours(c.duration, c.unit || 'min'), 0) + adminH
             const manual = toHours(dayData[d].totalHrs, dayData[d].totalUnit || 'hr')
-            return s + (manual > 0 ? manual : auto)
+            return s + (manual > 0 ? manual : autoH)
           }, 0)
+          const totAdmin = DAY_KEYS.reduce((s, d) =>
+            s + dayData[d].adminTasks.reduce((a, t) => a + toHours(t.duration, t.unit || 'min'), 0), 0)
+          // coaching = everything that isn't admin (same formula used when saving)
+          const totCoaching = Math.max(0, totAll - totAdmin)
           if (!totAll) return null
           return (
             <div className="mt-4 flex justify-end">
               <div className="bg-white border border-sand-200 rounded-xl px-5 py-3 flex items-center gap-5">
-                {totClient > 0 && (
+                {totCoaching > 0 && (
                   <>
                     <div className="text-center">
                       <p className="text-[10px] font-bold text-blush-400 uppercase tracking-wide">Coaching</p>
-                      <p className="text-lg font-bold text-blush-500">{totClient.toFixed(1)}h</p>
+                      <p className="text-lg font-bold text-blush-500">{totCoaching.toFixed(1)}h</p>
                     </div>
                     <div className="w-px h-8 bg-sand-200" />
                   </>
