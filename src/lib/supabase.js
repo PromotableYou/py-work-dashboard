@@ -373,10 +373,20 @@ export async function deleteRosterRow(id) {
 
 // ─── COACH LOGS ───────────────────────────────────────────────────────────────
 export async function getUnapprovedCoachLogsCount() {
+  // Only count unapproved logs within the current + previous pay period
+  // Pay periods: 14-day fortnights anchored at 2025-01-06
+  const anchor = new Date('2025-01-06')
+  const now    = new Date()
+  const diff   = Math.floor((now - anchor) / (1000 * 60 * 60 * 24 * 14))
+  const periodStart = new Date(anchor)
+  periodStart.setDate(anchor.getDate() + (diff - 1) * 14) // go back one extra period to catch recent pending
+  const fromISO = periodStart.toISOString().slice(0, 10)
+
   const { count, error } = await supabase
     .from('wd_coach_logs')
     .select('*', { count: 'exact', head: true })
     .eq('approved', false)
+    .gte('date', fromISO)
   if (error) return 0
   return count || 0
 }

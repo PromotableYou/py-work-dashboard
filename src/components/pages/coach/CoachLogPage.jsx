@@ -77,7 +77,7 @@ function formatWeek(monday) {
 // ─── Day defaults ────────────────────────────────────────────────────────────
 function emptyClient()    { return { client: '', duration: '', unit: 'min' } }
 function emptyAdminTask() { return { task:   '', duration: '', unit: 'min' } }
-function emptyDay()       { return { sessions: [], clients: [], adminTasks: [] } }
+function emptyDay()       { return { sessions: [], clients: [], adminTasks: [], totalHrs: '', totalUnit: 'hr' } }
 
 export default function CoachLogPage() {
   const { coachName } = useParams()
@@ -146,7 +146,11 @@ export default function CoachLogPage() {
         adminTasks = [{ task: log.notes.trim(), duration: '', unit: 'min' }]
       }
 
-      newData[day] = { sessions: log.sessions || [], clients, adminTasks }
+      // Restore manual total (stored in hours as decimal hrs)
+      const savedHrs = parseFloat(log.hours)
+      const totalHrs = !isNaN(savedHrs) && savedHrs > 0 ? String(savedHrs) : ''
+
+      newData[day] = { sessions: log.sessions || [], clients, adminTasks, totalHrs, totalUnit: 'hr' }
     })
 
     // Overlay roster for unlogged days
@@ -197,7 +201,9 @@ export default function CoachLogPage() {
         const validAdmin   = d.adminTasks.filter(t => t.task.trim())
         const clientH    = validClients.reduce((s, c) => s + toHours(c.duration, c.unit || 'min'), 0)
         const adminH     = validAdmin.reduce(  (s, t) => s + toHours(t.duration, t.unit || 'min'), 0)
-        const totalH     = clientH + adminH
+        const autoH      = clientH + adminH
+        const manualH    = toHours(d.totalHrs, d.totalUnit || 'hr')
+        const totalH     = manualH > 0 ? manualH : autoH   // manual overrides auto
 
         const hasAnything = totalH > 0 || d.sessions.length > 0 || validClients.length > 0 || validAdmin.length > 0
         if (!hasAnything) continue
@@ -313,10 +319,12 @@ export default function CoachLogPage() {
             const d        = dayData[day]
             const availableSessions = sessionTypes.filter(st => !d.sessions.includes(st.name))
 
-            // Live day total
+            // Live day totals
             const clientH  = d.clients.reduce(   (s, c) => s + toHours(c.duration, c.unit || 'min'), 0)
             const adminH   = d.adminTasks.reduce( (s, t) => s + toHours(t.duration, t.unit || 'min'), 0)
-            const dayTotal = clientH + adminH
+            const autoTotal  = clientH + adminH
+            const manualTotal = toHours(d.totalHrs, d.totalUnit || 'hr')
+            const dayTotal  = manualTotal > 0 ? manualTotal : autoTotal
 
             return (
               <div key={day} className={`bg-white border rounded-2xl flex flex-col overflow-hidden ${isToday ? 'border-blush-300 ring-2 ring-blush-100' : 'border-sand-200'}`}>
@@ -464,13 +472,34 @@ export default function CoachLogPage() {
                     )}
                   </div>
 
-                  {/* Day total (auto-computed) */}
-                  {dayTotal > 0 && (
-                    <div className="mt-auto pt-2.5 border-t border-sand-100 flex items-center justify-between">
-                      <span className="text-[10px] text-sand-400 font-semibold uppercase tracking-wide">Day total</span>
-                      <span className="text-sm font-bold text-sand-900">{dayTotal.toFixed(2)}h</span>
+                  {/* Editable total hours */}
+                  <div className="mt-auto pt-2.5 border-t border-sand-100">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold text-sand-600 uppercase tracking-wide">Total hrs worked</p>
+                        {autoTotal > 0 && (
+                          <p className="text-[10px] text-sand-400 mt-0.5">
+                            auto: {autoTotal.toFixed(2)}h
+                            {manualTotal > 0 && manualTotal !== autoTotal && (
+                              <button type="button"
+                                onClick={() => setDayData(p => ({ ...p, [day]: { ...p[day], totalHrs: String(autoTotal.toFixed(2)), totalUnit: 'hr' } }))}
+                                className="ml-1 underline hover:text-blush-500 transition-colors">use</button>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <DurationInput
+                        duration={d.totalHrs}
+                        unit={d.totalUnit || 'hr'}
+                        onDuration={v => setDayData(p => ({ ...p, [day]: { ...p[day], totalHrs: v } }))}
+                        onUnit={v     => setDayData(p => ({ ...p, [day]: { ...p[day], totalUnit: v } }))}
+                        placeholder={autoTotal > 0 ? autoTotal.toFixed(1) : '0'}
+                      />
                     </div>
-                  )}
+                    {dayTotal > 0 && (
+                      <p className="text-right text-xs font-bold text-sand-900 mt-1">= {dayTotal.toFixed(2)}h</p>
+                    )}
+                  </div>
 
                 </div>
               </div>
@@ -484,7 +513,12 @@ export default function CoachLogPage() {
             s + dayData[d].clients.reduce((a, c) => a + toHours(c.duration, c.unit || 'min'), 0), 0)
           const totAdmin  = DAY_KEYS.reduce((s, d) =>
             s + dayData[d].adminTasks.reduce((a, t) => a + toHours(t.duration, t.unit || 'min'), 0), 0)
-          const totAll    = totClient + totAdmin
+          const totAll    = DAY_KEYS.reduce((s, d) => {
+            const auto   = dayData[d].clients.reduce((a, c) => a + toHours(c.duration, c.unit || 'min'), 0)
+                         + dayData[d].adminTasks.reduce((a, t) => a + toHours(t.duration, t.unit || 'min'), 0)
+            const manual = toHours(dayData[d].totalHrs, dayData[d].totalUnit || 'hr')
+            return s + (manual > 0 ? manual : auto)
+          }, 0)
           if (!totAll) return null
           return (
             <div className="mt-4 flex justify-end">
