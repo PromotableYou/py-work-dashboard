@@ -35,8 +35,16 @@ function fmtH(n) {
   const s = parseFloat(n.toFixed(2))
   return `${s}h`
 }
+// Session type presets — label, duration (mins), unit
+const SESSION_PRESETS = [
+  { label: 'Clarity Call',   duration: '30', unit: 'min' },
+  { label: '1:1 Coaching',   duration: '45', unit: 'min' },
+  { label: 'Resume Review',  duration: '45', unit: 'min' },
+  { label: 'Other',          duration: '',   unit: 'min' },
+]
+
 function emptyDay() {
-  return { startTime: '', endTime: '', groupCoaching: false, clients: [] }
+  return { startTime: '', endTime: '', groupCoaching: false, groupSession: '', clients: [] }
 }
 
 // ─── Checkbox ─────────────────────────────────────────────────────────────────
@@ -106,18 +114,21 @@ export default function SimpleCoachLogPage() {
       if (m) { startTime = m[1]; endTime = m[2] }
 
       // Group coaching from sessions array
-      const groupCoaching = (log.sessions || []).some(s =>
+      const gcSession = (log.sessions || []).find(s =>
         (typeof s === 'string' ? s : s?.name) === 'Group Coaching'
       )
+      const groupCoaching = !!gcSession
+      const groupSession  = (gcSession && typeof gcSession === 'object' && gcSession.notes) || ''
 
       // 1:1 clients
       const clients = (log.private_sessions || []).map(c => ({
+        type:     c.type     || '',
         name:     c.client   || '',
         duration: String(c.duration || ''),
         unit:     c.unit     || 'min',
       }))
 
-      newData[day] = { startTime, endTime, groupCoaching, clients }
+      newData[day] = { startTime, endTime, groupCoaching, groupSession, clients }
     })
 
     setDayData(newData)
@@ -128,10 +139,20 @@ export default function SimpleCoachLogPage() {
     setDayData(p => ({ ...p, [day]: { ...p[day], [field]: val } }))
   }
   function addClient(day) {
-    setDayData(p => ({ ...p, [day]: { ...p[day], clients: [...p[day].clients, { name: '', duration: '', unit: 'min' }] } }))
+    setDayData(p => ({ ...p, [day]: { ...p[day], clients: [...p[day].clients, { type: '', name: '', duration: '', unit: 'min' }] } }))
   }
   function updateClient(day, idx, field, val) {
     setDayData(p => ({ ...p, [day]: { ...p[day], clients: p[day].clients.map((c, i) => i === idx ? { ...c, [field]: val } : c) } }))
+  }
+  function applyPreset(day, idx, label) {
+    const preset = SESSION_PRESETS.find(p => p.label === label)
+    setDayData(p => ({
+      ...p, [day]: {
+        ...p[day], clients: p[day].clients.map((c, i) =>
+          i === idx ? { ...c, type: label, duration: preset?.duration || '', unit: preset?.unit || 'min' } : c
+        )
+      }
+    }))
   }
   function removeClient(day, idx) {
     setDayData(p => ({ ...p, [day]: { ...p[day], clients: p[day].clients.filter((_, i) => i !== idx) } }))
@@ -158,12 +179,12 @@ export default function SimpleCoachLogPage() {
           coaching_hours:   hours,
           admin_hours:      0,
           sessions:         d.groupCoaching
-            ? [{ name: 'Group Coaching', duration: '1', unit: 'hr', hours: 1 }]
+            ? [{ name: 'Group Coaching', duration: '1', unit: 'hr', hours: 1, notes: d.groupSession || '' }]
             : [],
           private_sessions: validClients.map(c => {
             const dur = parseFloat(c.duration) || 0
             const hrs = c.unit === 'min' ? dur / 60 : dur
-            return { client: c.name, type: '1:1', duration: c.duration, unit: c.unit, hours: hrs }
+            return { client: c.name, type: c.type || '1:1', duration: c.duration, unit: c.unit, hours: hrs }
           }),
           admin_sessions: [],
           // Store times in notes so we can restore them on reload
@@ -335,38 +356,54 @@ export default function SimpleCoachLogPage() {
                         + Add client
                       </button>
                     ) : (
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         {d.clients.map((c, idx) => (
-                          <div key={idx} className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={c.name}
-                              onChange={e => updateClient(day, idx, 'name', e.target.value)}
-                              placeholder="Client name"
-                              className="flex-1 min-w-0 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:outline-none"
-                            />
-                            <div className="flex rounded-lg overflow-hidden border border-sand-300 focus-within:ring-1 focus-within:ring-blush-400 shrink-0">
-                              <input
-                                type="number"
-                                min="0"
-                                value={c.duration}
-                                onChange={e => updateClient(day, idx, 'duration', e.target.value)}
-                                placeholder="0"
-                                className="w-9 text-xs text-sand-900 placeholder-sand-400 bg-white px-1.5 py-1.5 text-center focus:outline-none"
-                              />
+                          <div key={idx} className="space-y-1">
+                            {/* Type + remove */}
+                            <div className="flex items-center gap-1">
                               <select
-                                value={c.unit}
-                                onChange={e => updateClient(day, idx, 'unit', e.target.value)}
-                                className="text-[10px] font-semibold bg-sand-50 text-sand-600 border-l border-sand-300 px-1 focus:outline-none cursor-pointer"
+                                value={c.type}
+                                onChange={e => applyPreset(day, idx, e.target.value)}
+                                className="flex-1 min-w-0 text-xs bg-blush-50 border border-blush-200 rounded-lg px-2 py-1.5 text-blush-700 font-semibold focus:ring-1 focus:ring-blush-400 focus:outline-none cursor-pointer"
                               >
-                                <option value="min">min</option>
-                                <option value="hr">hr</option>
+                                <option value="">Session type…</option>
+                                {SESSION_PRESETS.map(p => (
+                                  <option key={p.label} value={p.label}>{p.label}</option>
+                                ))}
                               </select>
+                              <button type="button" onClick={() => removeClient(day, idx)}
+                                className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                            <button type="button" onClick={() => removeClient(day, idx)}
-                              className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Name + duration */}
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={c.name}
+                                onChange={e => updateClient(day, idx, 'name', e.target.value)}
+                                placeholder="Client name"
+                                className="flex-1 min-w-0 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:outline-none"
+                              />
+                              <div className="flex rounded-lg overflow-hidden border border-sand-300 focus-within:ring-1 focus-within:ring-blush-400 shrink-0">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={c.duration}
+                                  onChange={e => updateClient(day, idx, 'duration', e.target.value)}
+                                  placeholder="0"
+                                  className="w-9 text-xs text-sand-900 placeholder-sand-400 bg-white px-1.5 py-1.5 text-center focus:outline-none"
+                                />
+                                <select
+                                  value={c.unit}
+                                  onChange={e => updateClient(day, idx, 'unit', e.target.value)}
+                                  className="text-[10px] font-semibold bg-sand-50 text-sand-600 border-l border-sand-300 px-1 focus:outline-none cursor-pointer"
+                                >
+                                  <option value="min">min</option>
+                                  <option value="hr">hr</option>
+                                </select>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -374,12 +411,21 @@ export default function SimpleCoachLogPage() {
                   </div>
 
                   {/* ── Group coaching ── */}
-                  <div className="mt-auto pt-3 border-t border-sand-100">
+                  <div className="mt-auto pt-3 border-t border-sand-100 space-y-2">
                     <Checkbox
                       checked={d.groupCoaching}
                       onChange={() => updateDay(day, 'groupCoaching', !d.groupCoaching)}
                       label="Group coaching today"
                     />
+                    {d.groupCoaching && (
+                      <input
+                        type="text"
+                        value={d.groupSession}
+                        onChange={e => updateDay(day, 'groupSession', e.target.value)}
+                        placeholder="What was the session?"
+                        className="w-full text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none"
+                      />
+                    )}
                   </div>
 
                 </div>
