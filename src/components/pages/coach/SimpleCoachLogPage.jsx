@@ -392,7 +392,7 @@ export default function SimpleCoachLogPage() {
                                   value={c.duration}
                                   onChange={e => updateClient(day, idx, 'duration', e.target.value)}
                                   placeholder="0"
-                                  className="w-9 text-xs text-sand-900 placeholder-sand-400 bg-white px-1.5 py-1.5 text-center focus:outline-none"
+                                  className="w-12 text-xs text-sand-900 placeholder-sand-400 bg-white px-1.5 py-1.5 text-center focus:outline-none"
                                 />
                                 <select
                                   value={c.unit}
