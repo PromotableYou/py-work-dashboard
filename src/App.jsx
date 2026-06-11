@@ -13,12 +13,16 @@ import TeamHoursPage from './components/pages/boss/TeamHoursPage'
 import CoachesCalendarPage from './components/pages/boss/CoachesCalendarPage'
 import RosterPage from './components/pages/boss/RosterPage'
 import CoachLogPage from './components/pages/coach/CoachLogPage'
+import SimpleCoachLogPage from './components/pages/coach/SimpleCoachLogPage'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         {/* Public coach log — no nav, coaches bookmark this */}
+        {/* Tanya & Tanaz get the simplified form; Bec keeps the full one */}
+        <Route path="/log/tanya" element={<SimpleCoachLogPage />} />
+        <Route path="/log/tanaz" element={<SimpleCoachLogPage />} />
         <Route path="/log/:coachName" element={<CoachLogPage />} />
 
         {/* Main app with sidebar nav */}
