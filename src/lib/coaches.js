@@ -1,6 +1,6 @@
 // The three coaches who log their hours via the public form
 export const COACHES = [
-  { name: 'Bec',   slug: 'bec',   email: 'bec@promotableyou.com.au'   },
+  { name: 'Bec',   slug: 'bec',   aliases: ['bec-log'], email: 'bec@promotableyou.com.au'   },
   { name: 'Tanya', slug: 'tanya', aliases: ['tanya-log'], email: 'tanya@promotableyou.com.au' },
   { name: 'Tanaz', slug: 'tanaz', aliases: ['tanaz-log'], email: 'tanaz@promotableyou.com.au' },
 ]
