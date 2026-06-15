@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, X, CheckCircle } from 'lucide-react'
-import { getSessionTypes, getCoachLogs, addCoachLog, updateCoachLog, getRosterBlocks } from '../../../lib/supabase'
+import { getSessionTypes, getCoachLogs, addCoachLog, updateCoachLog, deleteCoachLog, unapproveCoachLog, getRosterBlocks } from '../../../lib/supabase'
 import { coachBySlug } from '../../../lib/coaches'
 
 const DAY_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri']
@@ -272,10 +272,19 @@ export default function CoachLogPage() {
         const totalH     = manualH > 0 ? manualH : autoH
         const coachingH  = Math.max(0, totalH - adminH)  // all non-admin = coaching
 
-        const hasAnything = totalH > 0 || d.sessions.length > 0 || validClients.length > 0 || validAdmin.length > 0
-        if (!hasAnything) continue
+        const iso      = dayISO(day)
+        const existing = recentLogs.find(l => l.date === iso && l.coach_name === displayName)
 
-        const iso = dayISO(day)
+        const hasAnything = totalH > 0 || d.sessions.length > 0 || validClients.length > 0 || validAdmin.length > 0
+        if (!hasAnything) {
+          // Day was cleared — remove any previously saved log
+          if (existing) {
+            if (existing.approved) await unapproveCoachLog(existing.id, { person_name: displayName, date: iso })
+            await deleteCoachLog(existing.id)
+          }
+          continue
+        }
+
         const payload = {
           coach_name:      displayName,
           date:            iso,
@@ -300,7 +309,6 @@ export default function CoachLogPage() {
           notes: validAdmin.map(t => `${t.task}${t.duration ? ` (${fmtDuration(t.duration, t.unit || 'min')})` : ''}`).join(', '),
         }
 
-        const existing = recentLogs.find(l => l.date === iso && l.coach_name === displayName)
         if (existing) await updateCoachLog(existing.id, payload)
         else          await addCoachLog(payload)
       }

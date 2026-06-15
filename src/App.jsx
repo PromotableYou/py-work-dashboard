@@ -12,18 +12,25 @@ import MeetingsPage from './components/pages/boss/MeetingsPage'
 import TeamHoursPage from './components/pages/boss/TeamHoursPage'
 import CoachesCalendarPage from './components/pages/boss/CoachesCalendarPage'
 import RosterPage from './components/pages/boss/RosterPage'
+import { useParams } from 'react-router-dom'
 import CoachLogPage from './components/pages/coach/CoachLogPage'
 import SimpleCoachLogPage from './components/pages/coach/SimpleCoachLogPage'
+import { coachBySlug } from './lib/coaches'
+
+// Dispatch to the right form based on coach slug
+function CoachLogDispatch() {
+  const { coachName } = useParams()
+  const coach = coachBySlug(coachName || '')
+  if (['tanya', 'tanaz'].includes(coach?.slug)) return <SimpleCoachLogPage />
+  return <CoachLogPage />
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         {/* Public coach log — no nav, coaches bookmark this */}
-        {/* Tanya & Tanaz get the simplified form; Bec keeps the full one */}
-        <Route path="/log/tanya" element={<SimpleCoachLogPage />} />
-        <Route path="/log/tanaz" element={<SimpleCoachLogPage />} />
-        <Route path="/log/:coachName" element={<CoachLogPage />} />
+        <Route path="/log/:coachName" element={<CoachLogDispatch />} />
 
         {/* Main app with sidebar nav */}
         <Route path="*" element={

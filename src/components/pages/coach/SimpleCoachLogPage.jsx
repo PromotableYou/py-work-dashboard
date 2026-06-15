@@ -358,41 +358,36 @@ export default function SimpleCoachLogPage() {
                     ) : (
                       <div className="space-y-2">
                         {d.clients.map((c, idx) => (
-                          <div key={idx} className="space-y-1">
-                            {/* Type + remove */}
+                          <div key={idx} className="bg-sand-50 rounded-xl p-2 space-y-1.5">
+                            {/* Row 1: session type */}
+                            <select
+                              value={c.type}
+                              onChange={e => applyPreset(day, idx, e.target.value)}
+                              className="w-full text-xs bg-white border border-blush-200 rounded-lg px-2 py-1.5 text-blush-700 font-semibold focus:ring-1 focus:ring-blush-400 focus:outline-none cursor-pointer"
+                            >
+                              <option value="">Session type…</option>
+                              {SESSION_PRESETS.map(p => (
+                                <option key={p.label} value={p.label}>{p.label}</option>
+                              ))}
+                            </select>
+                            {/* Row 2: client name */}
+                            <input
+                              type="text"
+                              value={c.name}
+                              onChange={e => updateClient(day, idx, 'name', e.target.value)}
+                              placeholder="Client name"
+                              className="w-full text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:outline-none"
+                            />
+                            {/* Row 3: duration + remove */}
                             <div className="flex items-center gap-1">
-                              <select
-                                value={c.type}
-                                onChange={e => applyPreset(day, idx, e.target.value)}
-                                className="flex-1 min-w-0 text-xs bg-blush-50 border border-blush-200 rounded-lg px-2 py-1.5 text-blush-700 font-semibold focus:ring-1 focus:ring-blush-400 focus:outline-none cursor-pointer"
-                              >
-                                <option value="">Session type…</option>
-                                {SESSION_PRESETS.map(p => (
-                                  <option key={p.label} value={p.label}>{p.label}</option>
-                                ))}
-                              </select>
-                              <button type="button" onClick={() => removeClient(day, idx)}
-                                className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            {/* Name + duration */}
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="text"
-                                value={c.name}
-                                onChange={e => updateClient(day, idx, 'name', e.target.value)}
-                                placeholder="Client name"
-                                className="flex-1 min-w-0 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:outline-none"
-                              />
-                              <div className="flex rounded-lg overflow-hidden border border-sand-300 focus-within:ring-1 focus-within:ring-blush-400 shrink-0">
+                              <div className="flex rounded-lg overflow-hidden border border-sand-300 focus-within:ring-1 focus-within:ring-blush-400 flex-1">
                                 <input
                                   type="number"
                                   min="0"
                                   value={c.duration}
                                   onChange={e => updateClient(day, idx, 'duration', e.target.value)}
                                   placeholder="0"
-                                  className="w-12 text-xs text-sand-900 placeholder-sand-400 bg-white px-1.5 py-1.5 text-center focus:outline-none"
+                                  className="w-full text-xs text-sand-900 placeholder-sand-400 bg-white px-1.5 py-1.5 text-center focus:outline-none"
                                 />
                                 <select
                                   value={c.unit}
@@ -403,6 +398,10 @@ export default function SimpleCoachLogPage() {
                                   <option value="hr">hr</option>
                                 </select>
                               </div>
+                              <button type="button" onClick={() => removeClient(day, idx)}
+                                className="text-sand-400 hover:text-red-500 transition-colors shrink-0">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
                         ))}
