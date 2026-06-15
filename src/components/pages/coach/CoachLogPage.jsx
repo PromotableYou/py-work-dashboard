@@ -93,7 +93,7 @@ const CLIENT_PRESETS = [
 // ─── Day defaults ────────────────────────────────────────────────────────────
 // Sessions are objects {name, duration, unit} — default 1 hour each
 function emptySession(name) { return { name, duration: '1', unit: 'hr' } }
-function emptyClient()      { return { type: '', client: '', duration: '', unit: 'min' } }
+function emptyClient()      { return { type: '', customType: '', client: '', duration: '', unit: 'min' } }
 function emptyAdminTask()   { return { task: '', duration: '', unit: 'min' } }
 function emptyDay()         { return { sessions: [], clients: [], adminTasks: [], totalHrs: '', totalUnit: 'hr' } }
 
@@ -166,11 +166,16 @@ export default function CoachLogPage() {
       })
 
       // Restore clients — handle both clean numbers and old embedded "45min" strings
+      const PRESET_LABELS = CLIENT_PRESETS.map(p => p.label)
       const clients = (log.private_sessions || []).map(c => {
         const s = String(c.duration || '')
-        const duration = /[a-z]/i.test(s) ? parseDurationStr(s).duration : s
-        const unit     = /[a-z]/i.test(s) ? parseDurationStr(s).unit     : (c.unit || 'min')
-        return { type: c.type || '', client: c.client || '', duration, unit }
+        const duration   = /[a-z]/i.test(s) ? parseDurationStr(s).duration : s
+        const unit       = /[a-z]/i.test(s) ? parseDurationStr(s).unit     : (c.unit || 'min')
+        const savedType  = c.type || ''
+        const isPreset   = PRESET_LABELS.includes(savedType)
+        const type       = isPreset ? savedType : (savedType ? 'Custom' : '')
+        const customType = isPreset ? '' : savedType
+        return { type, customType, client: c.client || '', duration, unit }
       })
 
       // Restore admin tasks
@@ -294,7 +299,7 @@ export default function CoachLogPage() {
           // store sessions as objects so durations survive round-trip
           sessions:        d.sessions.map(s => ({ name: s.name, duration: s.duration, unit: s.unit || 'hr', hours: toHours(s.duration, s.unit || 'hr') })),
           private_sessions: validClients.map(c => ({
-            type:     c.type || '',
+            type:     c.type === 'Custom' ? (c.customType.trim() || 'Custom') : (c.type || ''),
             client:   c.client,
             duration: c.duration,
             unit:     c.unit || 'min',
@@ -498,23 +503,34 @@ export default function CoachLogPage() {
                     ) : (
                       <div className="space-y-1.5">
                         {d.clients.map((c, idx) => (
-                          <div key={idx} className="space-y-1">
-                            <div className="flex gap-1 items-center">
-                              {/* Session type dropdown */}
-                              <select
-                                value={c.type || ''}
-                                onChange={e => applyClientPreset(day, idx, e.target.value)}
-                                className="text-xs bg-blush-50 border border-blush-200 rounded-lg px-1.5 py-1.5 text-blush-700 font-semibold focus:outline-none focus:ring-1 focus:ring-blush-400 cursor-pointer shrink-0 max-w-[120px]"
-                              >
-                                <option value="">Type…</option>
-                                {CLIENT_PRESETS.map(p => (
-                                  <option key={p.label} value={p.label}>{p.label}</option>
-                                ))}
-                              </select>
+                          <div key={idx} className="bg-sand-50 rounded-xl p-2 space-y-1.5">
+                            {/* Row 1: session type */}
+                            <select
+                              value={c.type || ''}
+                              onChange={e => applyClientPreset(day, idx, e.target.value)}
+                              className="w-full text-xs bg-white border border-blush-200 rounded-lg px-2 py-1.5 text-blush-700 font-semibold focus:outline-none focus:ring-1 focus:ring-blush-400 cursor-pointer"
+                            >
+                              <option value="">Session type…</option>
+                              {CLIENT_PRESETS.map(p => (
+                                <option key={p.label} value={p.label}>{p.label}</option>
+                              ))}
+                            </select>
+                            {/* Row 1b: custom type text when Custom selected */}
+                            {c.type === 'Custom' && (
+                              <input
+                                type="text"
+                                value={c.customType || ''}
+                                onChange={e => updateClient(day, idx, 'customType', e.target.value)}
+                                placeholder="Describe the session…"
+                                className="w-full text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:outline-none"
+                              />
+                            )}
+                            {/* Row 2: client name + duration + remove */}
+                            <div className="flex items-center gap-1">
                               <input type="text" value={c.client}
                                 onChange={e => updateClient(day, idx, 'client', e.target.value)}
                                 placeholder="Client name"
-                                className="flex-1 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none min-w-0" />
+                                className="flex-1 min-w-0 text-xs bg-white border border-sand-300 rounded-lg px-2 py-1.5 text-sand-900 placeholder-sand-400 focus:ring-1 focus:ring-blush-400 focus:border-blush-400 focus:outline-none" />
                               <DurationInput
                                 duration={c.duration} unit={c.unit || 'min'}
                                 onDuration={v => updateClient(day, idx, 'duration', v)}
