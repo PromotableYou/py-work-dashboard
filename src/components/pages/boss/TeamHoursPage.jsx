@@ -161,8 +161,9 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
   // Filter logs to current pay period
   const periodLogs = logs.filter(l => l.date >= periodStartISO && l.date <= periodEndISO)
 
-  function copyLink(slug) {
-    const url = `${window.location.origin}/log/${slug}`
+  function copyLink(slug, aliases) {
+    const linkSlug = (aliases && aliases.length > 0) ? aliases[0] : slug
+    const url = `${window.location.origin}/log/${linkSlug}`
     navigator.clipboard.writeText(url).then(() => {
       setCopiedId(slug)
       setTimeout(() => setCopiedId(null), 2000)
@@ -289,7 +290,7 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
                     </div>
                   )}
                   <button
-                    onClick={e => { e.stopPropagation(); copyLink(coach.slug) }}
+                    onClick={e => { e.stopPropagation(); copyLink(coach.slug, coach.aliases) }}
                     className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all ${
                       copiedId === coach.slug
                         ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
