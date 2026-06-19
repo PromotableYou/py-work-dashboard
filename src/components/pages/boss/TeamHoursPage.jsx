@@ -151,7 +151,22 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
 
   useEffect(() => {
     getAllCoachLogs()
-      .then(l => setLogs(l))
+      .then(l => {
+        setLogs(l)
+        // If there are unapproved logs outside the current period, auto-jump to
+        // the period containing the most recent one
+        const anchor = new Date('2025-01-06')
+        const now    = new Date()
+        const currentDiff = Math.floor((now - anchor) / (1000 * 60 * 60 * 24 * 14))
+        const pending = l.filter(log => !log.approved)
+        if (pending.length > 0) {
+          const latestDate = pending.reduce((max, log) => log.date > max ? log.date : max, pending[0].date)
+          const target = new Date(latestDate + 'T12:00:00')
+          const targetDiff = Math.floor((target - anchor) / (1000 * 60 * 60 * 24 * 14))
+          const offset = targetDiff - currentDiff
+          if (offset !== 0) setPeriodOffset(offset)
+        }
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -160,6 +175,9 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
 
   // Filter logs to current pay period
   const periodLogs = logs.filter(l => l.date >= periodStartISO && l.date <= periodEndISO)
+
+  // Unapproved logs sitting outside the currently-viewed period
+  const stalePending = logs.filter(l => !l.approved && (l.date < periodStartISO || l.date > periodEndISO))
 
   function copyLink(slug, aliases) {
     const linkSlug = (aliases && aliases.length > 0) ? aliases[0] : slug
@@ -216,6 +234,51 @@ function CoachLogsTab({ periodStart, periodEnd, periodOffset, setPeriodOffset, o
           <AlertCircle className="w-4 h-4 shrink-0" /> {approveError}
         </div>
       )}
+
+      {/* Stale pending banner — logs outside the currently-viewed period */}
+      {stalePending.length > 0 && (() => {
+        const byCoach = {}
+        stalePending.forEach(l => {
+          const name = l.coach_name || 'Unknown'
+          if (!byCoach[name]) byCoach[name] = []
+          byCoach[name].push(l)
+        })
+        const earliestDate = stalePending.reduce((min, l) => l.date < min ? l.date : min, stalePending[0].date)
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-800 mb-1.5">
+                  {stalePending.length} unapproved log{stalePending.length !== 1 ? 's' : ''} from a previous pay period
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(byCoach).map(([name, coachLogs]) => (
+                    <span key={name} className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                      {name} · {coachLogs.length} log{coachLogs.length !== 1 ? 's' : ''}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-amber-500 mt-1.5">
+                  Earliest: {new Date(earliestDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const anchor = new Date('2025-01-06')
+                  const target = new Date(earliestDate + 'T12:00:00')
+                  const diff        = Math.floor((target - anchor) / (1000 * 60 * 60 * 24 * 14))
+                  const currentDiff = Math.floor((new Date() - anchor) / (1000 * 60 * 60 * 24 * 14))
+                  setPeriodOffset(diff - currentDiff)
+                }}
+                className="shrink-0 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Go to period
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Pay period navigator */}
       <div className="bg-white border border-sand-200 rounded-2xl px-5 py-3 flex items-center justify-between">
         <button onClick={() => setPeriodOffset(o => o - 1)} className="p-1.5 rounded-lg hover:bg-sand-100 text-sand-400 hover:text-sand-700 transition-colors">
