@@ -365,6 +365,7 @@ function PaySummary({ fortnight, rows }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 const PERSON_LABEL = { shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em', william: 'William', tanya: 'Tanya', tanaz: 'Tanaz' }
+const COACH_LOG_URL = { tanya: '/log/tanya-log', tanaz: '/log/tanaz-log' }
 
 export default function TimesheetPage({ workspace = 'shaniah' }) {
   const [cycleStart, setCycleStart] = useState(getMostRecentFortnight)
@@ -455,12 +456,21 @@ export default function TimesheetPage({ workspace = 'shaniah' }) {
           >
             <Printer className="w-3.5 h-3.5" /> PDF
           </button>
-          <button
-            onClick={() => sendEmail(fortnight, rows, cycleLabel)}
-            className="flex items-center gap-1.5 text-sm bg-blush-500 hover:bg-blush-600 text-white font-medium px-3 py-2 rounded-xl transition-colors"
-          >
-            <Send className="w-3.5 h-3.5" /> Send to Stacey
-          </button>
+          {COACH_LOG_URL[workspace] ? (
+            <a
+              href={COACH_LOG_URL[workspace]}
+              className="flex items-center gap-1.5 text-sm bg-blush-500 hover:bg-blush-600 text-white font-medium px-3 py-2 rounded-xl transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" /> Log Hours
+            </a>
+          ) : (
+            <button
+              onClick={() => sendEmail(fortnight, rows, cycleLabel)}
+              className="flex items-center gap-1.5 text-sm bg-blush-500 hover:bg-blush-600 text-white font-medium px-3 py-2 rounded-xl transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" /> Send to Stacey
+            </button>
+          )}
         </div>
       </div>
 
