@@ -8,7 +8,18 @@ import { getTasks, getProjects, getSubtasks, getDumps, getIdeas, getTimelog } fr
 import { getStreak } from './TasksPage'
 import QuickLinks from '../QuickLinks'
 
-const GCAL_AGENDA = 'https://calendar.google.com/calendar/embed?src=shaniah%40promotableyou.com.au&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA'
+const WORKSPACE_CONFIG = {
+  shaniah: { name: 'Shaniah', email: 'shaniah@promotableyou.com.au' },
+  stacey:  { name: 'Stacey',  email: 'stacey@promotableyou.com.au'  },
+  em:      { name: 'Em',      email: 'em@promotableyou.com.au'      },
+  william: { name: 'William', email: 'william@promotableyou.com.au' },
+  tanya:   { name: 'Tanya',   email: 'tanya@promotableyou.com.au'   },
+  tanaz:   { name: 'Tanaz',   email: 'tanaz@promotableyou.com.au'   },
+}
+
+function gcalAgenda(email) {
+  return `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(email)}&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA`
+}
 
 function localISO(date = new Date()) {
   const y = date.getFullYear()
@@ -232,7 +243,7 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
             {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <h1 className="text-4xl font-bold">{greeting()}, Shaniah 👋</h1>
+            <h1 className="text-4xl font-bold">{greeting()}, {WORKSPACE_CONFIG[workspace]?.name || workspace} 👋</h1>
             {streak.current > 0 && (
               <span className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-sm font-bold text-white border border-white/30">
                 <Flame className="w-4 h-4 text-orange-300" />
@@ -483,7 +494,7 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
             </div>
             <div className="overflow-hidden" style={{ height: 260 }}>
               <iframe
-                src={GCAL_AGENDA}
+                src={gcalAgenda(WORKSPACE_CONFIG[workspace]?.email || 'shaniah@promotableyou.com.au')}
                 style={{ border: 0, marginTop: -46, display: 'block' }}
                 width="100%"
                 height="320"
