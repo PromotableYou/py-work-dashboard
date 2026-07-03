@@ -89,7 +89,7 @@ export default function App() {
                   <Route path="/tanya/notes" element={<NotesPage workspace="tanya" />} />
                   <Route path="/tanya/ideas" element={<IdeasPage workspace="tanya" />} />
                   <Route path="/tanya/dump" element={<BrainDumpPage workspace="tanya" />} />
-                  <Route path="/tanya/timesheet" element={<TimesheetPage workspace="tanya" />} />
+                  <Route path="/tanya/timesheet" element={<SimpleCoachLogPage coachSlug="tanya-log" />} />
                   {/* Tanaz */}
                   <Route path="/tanaz" element={<DashboardPage workspace="tanaz" />} />
                   <Route path="/tanaz/tasks" element={<TasksPage workspace="tanaz" />} />
@@ -98,7 +98,7 @@ export default function App() {
                   <Route path="/tanaz/notes" element={<NotesPage workspace="tanaz" />} />
                   <Route path="/tanaz/ideas" element={<IdeasPage workspace="tanaz" />} />
                   <Route path="/tanaz/dump" element={<BrainDumpPage workspace="tanaz" />} />
-                  <Route path="/tanaz/timesheet" element={<TimesheetPage workspace="tanaz" />} />
+                  <Route path="/tanaz/timesheet" element={<SimpleCoachLogPage coachSlug="tanaz-log" />} />
                 </Routes>
               </div>
             </main>

@@ -66,12 +66,11 @@ function Checkbox({ checked, onChange, label }) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function SimpleCoachLogPage() {
+export default function SimpleCoachLogPage({ coachSlug: coachSlugProp } = {}) {
   const params   = useParams()
   const location = useLocation()
-  // Works for both /log/:coachName (wildcard) and exact routes like /log/tanya
   const slugFromPath = location.pathname.split('/').pop()
-  const slug     = params.coachName || slugFromPath
+  const slug     = coachSlugProp || params.coachName || slugFromPath
   const coach    = coachBySlug(slug || '')
   const displayName = coach?.name || null
 
