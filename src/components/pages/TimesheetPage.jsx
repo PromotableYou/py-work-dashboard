@@ -61,11 +61,11 @@ function buildSummary(fortnight, rows) {
   return { allRows, totalHours, workedDays, leaveDays }
 }
 
-function downloadCSV(fortnight, rows, cycleLabel) {
+function downloadCSV(fortnight, rows, cycleLabel, personName = 'Shaniah') {
   const { allRows, totalHours, workedDays, leaveDays } = buildSummary(fortnight, rows)
 
   const lines = [
-    ['Timesheet — Shaniah Langridge'],
+    [`Timesheet — ${personName}`],
     [`Period: ${cycleLabel}`],
     [],
     ['Date', 'Day', 'Status', 'Type', 'Hours', 'Notes'],
@@ -90,12 +90,12 @@ function downloadCSV(fortnight, rows, cycleLabel) {
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  a.download = `timesheet-shaniah-${toISO(new Date())}.csv`
+  a.download = `timesheet-${personName.toLowerCase()}-${toISO(new Date())}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
 
-function sendEmail(fortnight, rows, cycleLabel) {
+function sendEmail(fortnight, rows, cycleLabel, personName = 'Shaniah') {
   const { allRows, totalHours, workedDays, leaveDays } = buildSummary(fortnight, rows)
 
   const dayLines = allRows.map(r => {
@@ -123,10 +123,10 @@ function sendEmail(fortnight, rows, cycleLabel) {
     ...dayLines.slice(5, 10),
     ``,
     `Kind regards,`,
-    `Shaniah`,
+    personName,
   ].filter(l => l !== null).join('\n')
 
-  const subject = encodeURIComponent(`Timesheet — Shaniah — ${cycleLabel}`)
+  const subject = encodeURIComponent(`Timesheet — ${personName} — ${cycleLabel}`)
   const bodyEnc = encodeURIComponent(body)
   window.location.href = `mailto:${STACEY_EMAIL}?subject=${subject}&body=${bodyEnc}`
 }
@@ -198,7 +198,7 @@ function DayCard({ day, row, onChange, isToday }) {
 }
 
 // ─── Print table (hidden on screen, shown on print) ───────────────────────────
-function PrintTable({ fortnight, rows, cycleLabel }) {
+function PrintTable({ fortnight, rows, cycleLabel, personName = 'Shaniah' }) {
   const week1 = fortnight.slice(0, 5)
   const week2 = fortnight.slice(5, 10)
   const { totalHours, workedDays, leaveDays } = buildSummary(fortnight, rows)
@@ -232,7 +232,7 @@ function PrintTable({ fortnight, rows, cycleLabel }) {
     <div className="hidden print:block" style={{ fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 'bold', margin: 0 }}>Timesheet — Shaniah Langridge</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 'bold', margin: 0 }}>Timesheet — {personName}</h1>
         <p style={{ fontSize: 12, color: '#888', margin: '4px 0 0' }}>Pay period: {cycleLabel}</p>
       </div>
 
@@ -427,7 +427,7 @@ export default function TimesheetPage({ workspace = 'shaniah' }) {
       <div className="flex items-start justify-between flex-wrap gap-3 print:hidden">
         <div>
           <h1 className="text-xl font-bold text-sand-900">Time Log</h1>
-          <p className="text-sand-400 text-sm mt-0.5">Shaniah — {cycleLabel}</p>
+          <p className="text-sand-400 text-sm mt-0.5">{PERSON_LABEL[workspace] || workspace} — {cycleLabel}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Pay period navigator */}
@@ -445,7 +445,7 @@ export default function TimesheetPage({ workspace = 'shaniah' }) {
 
           {/* Export buttons */}
           <button
-            onClick={() => downloadCSV(fortnight, rows, cycleLabel)}
+            onClick={() => downloadCSV(fortnight, rows, cycleLabel, PERSON_LABEL[workspace] || workspace)}
             className="flex items-center gap-1.5 text-sm border border-sand-200 bg-white hover:bg-sand-50 text-sand-600 px-3 py-2 rounded-xl transition-colors"
           >
             <Download className="w-3.5 h-3.5" /> CSV
@@ -465,7 +465,7 @@ export default function TimesheetPage({ workspace = 'shaniah' }) {
             </a>
           ) : (
             <button
-              onClick={() => sendEmail(fortnight, rows, cycleLabel)}
+              onClick={() => sendEmail(fortnight, rows, cycleLabel, PERSON_LABEL[workspace] || workspace)}
               className="flex items-center gap-1.5 text-sm bg-blush-500 hover:bg-blush-600 text-white font-medium px-3 py-2 rounded-xl transition-colors"
             >
               <Send className="w-3.5 h-3.5" /> Send to Stacey
@@ -508,7 +508,7 @@ export default function TimesheetPage({ workspace = 'shaniah' }) {
       </div>
 
       {/* Print view */}
-      <PrintTable fortnight={fortnight} rows={rows} cycleLabel={cycleLabel} />
+      <PrintTable fortnight={fortnight} rows={rows} cycleLabel={cycleLabel} personName={PERSON_LABEL[workspace] || workspace} />
     </div>
   )
 }
