@@ -163,16 +163,29 @@ export async function deleteRecurringTask(id) {
 }
 
 // ─── TIMELOG ──────────────────────────────────────────────────────────────────
-export async function getTimelog() {
+export async function getTimelog(workspace = 'shaniah') {
+  // Try workspace-filtered first; fall back to unfiltered if column not yet added
   const { data, error } = await supabase
-    .from('wd_timelog').select('*').order('date', { ascending: true })
-  if (error) throw error
+    .from('wd_timelog').select('*').eq('workspace', workspace).order('date', { ascending: true })
+  if (error) {
+    const { data: all, error: e2 } = await supabase
+      .from('wd_timelog').select('*').order('date', { ascending: true })
+    if (e2) throw e2
+    return all
+  }
   return data
 }
-export async function upsertTimelogRow(row) {
+export async function upsertTimelogRow(row, workspace = 'shaniah') {
+  const rowWithWs = { ...row, workspace }
+  // Try with workspace column; fall back to original upsert if column not yet added
   const { data, error } = await supabase
-    .from('wd_timelog').upsert([row], { onConflict: 'date' }).select().single()
-  if (error) throw error
+    .from('wd_timelog').upsert([rowWithWs], { onConflict: 'date,workspace' }).select().single()
+  if (error) {
+    const { data: d2, error: e2 } = await supabase
+      .from('wd_timelog').upsert([row], { onConflict: 'date' }).select().single()
+    if (e2) throw e2
+    return d2
+  }
   return data
 }
 export async function deleteTimelogRow(id) {

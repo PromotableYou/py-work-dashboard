@@ -152,19 +152,19 @@ function dueDiff(dueDate) {
   return Math.round((new Date(dueDate) - new Date(TODAY)) / 86400000)
 }
 
-export default function DashboardPage() {
+export default function DashboardPage({ workspace = 'shaniah' }) {
   const [data, setData]     = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]   = useState(null)
 
   useEffect(() => {
-    Promise.all([getTasks(), getProjects(), getSubtasks(), getDumps(), getIdeas(), getTimelog()])
+    Promise.all([getTasks(workspace), getProjects(workspace), getSubtasks(workspace), getDumps(workspace), getIdeas(workspace), getTimelog(workspace)])
       .then(([tasks, projects, subtasks, dumps, ideas, timelog]) => {
         setData({ tasks, projects, subtasks, dumps, ideas, timelog })
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [workspace])
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -269,7 +269,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Quick Links ── */}
-      <QuickLinks workspace="shaniah" />
+      <QuickLinks workspace={workspace} />
 
       {/* ── Overdue / due soon alert ── */}
       {(overdue.length > 0 || dueSoon.length > 0) && (

@@ -61,6 +61,46 @@ export default function App() {
                   <Route path="/stacey/coaches-calendar" element={<CoachesCalendarPage />} />
                   <Route path="/stacey/roster" element={<RosterPage readOnly />} />
                   <Route path="/stacey/team-hours" element={<TeamHoursPage />} />
+                  {/* Em */}
+                  <Route path="/em" element={<DashboardPage workspace="em" />} />
+                  <Route path="/em/tasks" element={<TasksPage workspace="em" />} />
+                  <Route path="/em/calendar" element={<CalendarPage calendarEmail="em@promotableyou.com.au" />} />
+                  <Route path="/em/meetings" element={<MeetingsPage workspace="em" />} />
+                  <Route path="/em/coaches-calendar" element={<CoachesCalendarPage />} />
+                  <Route path="/em/roster" element={<RosterPage />} />
+                  <Route path="/em/notes" element={<NotesPage workspace="em" />} />
+                  <Route path="/em/ideas" element={<IdeasPage workspace="em" />} />
+                  <Route path="/em/dump" element={<BrainDumpPage workspace="em" />} />
+                  <Route path="/em/timesheet" element={<TimesheetPage workspace="em" />} />
+                  {/* William */}
+                  <Route path="/william" element={<DashboardPage workspace="william" />} />
+                  <Route path="/william/tasks" element={<TasksPage workspace="william" />} />
+                  <Route path="/william/calendar" element={<CalendarPage calendarEmail="william@promotableyou.com.au" />} />
+                  <Route path="/william/meetings" element={<MeetingsPage workspace="william" />} />
+                  <Route path="/william/coaches-calendar" element={<CoachesCalendarPage />} />
+                  <Route path="/william/roster" element={<RosterPage />} />
+                  <Route path="/william/notes" element={<NotesPage workspace="william" />} />
+                  <Route path="/william/ideas" element={<IdeasPage workspace="william" />} />
+                  <Route path="/william/dump" element={<BrainDumpPage workspace="william" />} />
+                  <Route path="/william/timesheet" element={<TimesheetPage workspace="william" />} />
+                  {/* Tanya */}
+                  <Route path="/tanya" element={<DashboardPage workspace="tanya" />} />
+                  <Route path="/tanya/tasks" element={<TasksPage workspace="tanya" />} />
+                  <Route path="/tanya/calendar" element={<CalendarPage calendarEmail="tanya@promotableyou.com.au" />} />
+                  <Route path="/tanya/roster" element={<RosterPage readOnly />} />
+                  <Route path="/tanya/notes" element={<NotesPage workspace="tanya" />} />
+                  <Route path="/tanya/ideas" element={<IdeasPage workspace="tanya" />} />
+                  <Route path="/tanya/dump" element={<BrainDumpPage workspace="tanya" />} />
+                  <Route path="/tanya/timesheet" element={<TimesheetPage workspace="tanya" />} />
+                  {/* Tanaz */}
+                  <Route path="/tanaz" element={<DashboardPage workspace="tanaz" />} />
+                  <Route path="/tanaz/tasks" element={<TasksPage workspace="tanaz" />} />
+                  <Route path="/tanaz/calendar" element={<CalendarPage calendarEmail="tanaz@promotableyou.com.au" />} />
+                  <Route path="/tanaz/roster" element={<RosterPage readOnly />} />
+                  <Route path="/tanaz/notes" element={<NotesPage workspace="tanaz" />} />
+                  <Route path="/tanaz/ideas" element={<IdeasPage workspace="tanaz" />} />
+                  <Route path="/tanaz/dump" element={<BrainDumpPage workspace="tanaz" />} />
+                  <Route path="/tanaz/timesheet" element={<TimesheetPage workspace="tanaz" />} />
                 </Routes>
               </div>
             </main>

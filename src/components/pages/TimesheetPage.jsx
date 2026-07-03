@@ -364,7 +364,9 @@ function PaySummary({ fortnight, rows }) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function TimesheetPage() {
+const PERSON_LABEL = { shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em', william: 'William', tanya: 'Tanya', tanaz: 'Tanaz' }
+
+export default function TimesheetPage({ workspace = 'shaniah' }) {
   const [cycleStart, setCycleStart] = useState(getMostRecentFortnight)
   const [rows, setRows]     = useState({})
   const [loading, setLoading] = useState(true)
@@ -377,11 +379,11 @@ export default function TimesheetPage() {
   const cycleLabel = `${cycleStart.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} — ${addDays(cycleStart, 13).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
   useEffect(() => {
-    getTimelog()
+    getTimelog(workspace)
       .then(data => { const m = {}; data.forEach(r => { m[r.date] = r }); setRows(m) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [workspace])
 
   function getRow(date) {
     return rows[date] || { date, type: 'Normal', clock_in: '', clock_out: '', notes: '' }
@@ -391,17 +393,17 @@ export default function TimesheetPage() {
     const updated = { ...getRow(date), ...updates }
     setRows(prev => ({ ...prev, [date]: updated }))
     try {
-      const saved = await upsertTimelogRow(updated)
+      const saved = await upsertTimelogRow(updated, workspace)
       setRows(prev => ({ ...prev, [date]: saved }))
       await upsertTeamHourRow({
-        person_name: 'Shaniah',
+        person_name: PERSON_LABEL[workspace] || workspace,
         date,
         worked: !!(saved.clock_in),
         type: saved.type || 'Normal',
         notes: saved.notes || '',
       })
     } catch (e) { setError(e.message) }
-  }, [rows])
+  }, [rows, workspace])
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">

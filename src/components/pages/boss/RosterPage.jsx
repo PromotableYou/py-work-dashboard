@@ -14,19 +14,15 @@ const PALETTE_COLORS = [
   '#6ee7b7','#7dd3fc','#a5b4fc','#d8b4fe','#f0abfc','#94a3b8',
 ]
 
-// All 11 fixed types + 1 custom slot
 const DEFAULT_TYPES = [
-  { name: 'Evening Q&A',               color: '#a5b4fc', is_custom: false },
-  { name: 'Confidence & Clarity',      color: '#f9a8d4', is_custom: false },
-  { name: 'TLC Hour of Power',         color: '#d8b4fe', is_custom: false, has_topic: true },
-  { name: 'Game Plan & Orientation',   color: '#86efac', is_custom: false },
-  { name: 'Q&A Breakout Room',         color: '#7dd3fc', is_custom: false },
-  { name: 'New & Fast Start Breakout', color: '#6ee7b7', is_custom: false },
-  { name: 'Senior Exec Breakout',      color: '#475569', is_custom: false },
-  { name: 'Early Access Breakout',     color: '#fdba74', is_custom: false },
-  { name: 'TLC Q&A',                   color: '#c4b5fd', is_custom: false },
-  { name: 'Resume & Interviews',       color: '#93c5fd', is_custom: false },
-  { name: 'Custom',                    color: '#94a3b8', is_custom: true  },
+  { name: 'Resume Room',                       color: '#93c5fd', is_custom: false },
+  { name: 'General Q&A',                       color: '#86efac', is_custom: false },
+  { name: 'Senior Exec Room',                  color: '#475569', is_custom: false },
+  { name: 'Role Clarity & USP',                color: '#d8b4fe', is_custom: false },
+  { name: 'Interview Prep & Roleplay',         color: '#fdba74', is_custom: false },
+  { name: 'Early Access & Recruiter Strategy', color: '#6ee7b7', is_custom: false },
+  { name: 'Evening Q&A',                       color: '#a5b4fc', is_custom: false },
+  { name: 'Custom',                            color: '#94a3b8', is_custom: true  },
 ]
 
 function toISO(date) {
@@ -340,6 +336,19 @@ export default function RosterPage({ readOnly = false }) {
     } catch (e) { setError(e.message) }
   }
 
+  async function handleResetSessionTypes() {
+    if (!window.confirm('Replace all session types with the new CAP schedule? This cannot be undone.')) return
+    try {
+      for (const st of sessionTypes) await deleteSessionType(st.id)
+      const saved = []
+      for (let i = 0; i < DEFAULT_TYPES.length; i++) {
+        const s = await addSessionType({ ...DEFAULT_TYPES[i], sort_order: i })
+        saved.push(s)
+      }
+      setSessionTypes(saved)
+    } catch (e) { setError(e.message) }
+  }
+
   async function handleCopyLastWeek() {
     try {
       const prevISO    = toISO(addDays(weekStart, -7))
@@ -403,9 +412,17 @@ export default function RosterPage({ readOnly = false }) {
 
       {/* Session type palette — hidden for read-only view */}
       {!readOnly && <div className="bg-white border border-sand-200 rounded-2xl p-4 no-print">
-        <div className="flex items-center gap-2 mb-3">
-          <p className="text-xs font-bold text-sand-500 uppercase tracking-widest">Session Types</p>
-          <p className="text-[10px] text-sand-400">— drag onto the roster · click time/topic on a block to edit</p>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-bold text-sand-500 uppercase tracking-widest">Session Types</p>
+            <p className="text-[10px] text-sand-400">— drag onto the roster · click time/topic on a block to edit</p>
+          </div>
+          <button
+            onClick={handleResetSessionTypes}
+            className="text-[10px] text-sand-400 hover:text-red-500 border border-dashed border-sand-200 hover:border-red-300 rounded-lg px-2 py-1 transition-colors"
+          >
+            Reset to new schedule
+          </button>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           {sessionTypes.map(st => (
