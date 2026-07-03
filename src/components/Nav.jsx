@@ -46,7 +46,6 @@ const WORKSPACES = [
       { to: '/em/notes',           icon: StickyNote,      label: 'Notes'       },
       { to: '/em/ideas',           icon: Lightbulb,       label: 'Ideas'       },
       { to: '/em/dump',            icon: Brain,           label: 'Brain Dump'  },
-      { to: '/em/timesheet',       icon: Clock,           label: 'Timesheet'   },
     ],
   },
   {
@@ -61,7 +60,6 @@ const WORKSPACES = [
       { to: '/william/notes',           icon: StickyNote,      label: 'Notes'       },
       { to: '/william/ideas',           icon: Lightbulb,       label: 'Ideas'       },
       { to: '/william/dump',            icon: Brain,           label: 'Brain Dump'  },
-      { to: '/william/timesheet',       icon: Clock,           label: 'Timesheet'   },
     ],
   },
   {

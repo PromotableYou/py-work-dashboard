@@ -71,7 +71,6 @@ export default function App() {
                   <Route path="/em/notes" element={<NotesPage workspace="em" />} />
                   <Route path="/em/ideas" element={<IdeasPage workspace="em" />} />
                   <Route path="/em/dump" element={<BrainDumpPage workspace="em" />} />
-                  <Route path="/em/timesheet" element={<TimesheetPage workspace="em" />} />
                   {/* William */}
                   <Route path="/william" element={<DashboardPage workspace="william" />} />
                   <Route path="/william/tasks" element={<TasksPage workspace="william" />} />
@@ -82,7 +81,6 @@ export default function App() {
                   <Route path="/william/notes" element={<NotesPage workspace="william" />} />
                   <Route path="/william/ideas" element={<IdeasPage workspace="william" />} />
                   <Route path="/william/dump" element={<BrainDumpPage workspace="william" />} />
-                  <Route path="/william/timesheet" element={<TimesheetPage workspace="william" />} />
                   {/* Tanya */}
                   <Route path="/tanya" element={<DashboardPage workspace="tanya" />} />
                   <Route path="/tanya/tasks" element={<TasksPage workspace="tanya" />} />
