@@ -335,24 +335,16 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
           <div className="flex gap-2">
             <input autoFocus value={linkInput} onChange={e => setLinkInput(e.target.value)}
               onKeyDown={e => { if (e.key==='Enter') saveLink(); if (e.key==='Escape') setLinkMode(false) }}
-              placeholder="Paste Zoom, Loom or Drive link…"
+              placeholder="Zoom cloud, Loom or Drive link…"
               className="flex-1 text-sm border border-sand-200 rounded-xl px-3 py-2 outline-none focus:border-blush-300"/>
             <button onClick={saveLink} className="px-3 py-2 bg-blush-500 text-white rounded-xl text-sm">Save</button>
             <button onClick={() => setLinkMode(false)} className="text-sand-400 px-2"><X className="w-4 h-4"/></button>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <button onClick={() => fileRef.current?.click()} disabled={uploading}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-sand-200 text-sand-600 hover:bg-sand-50 transition-colors disabled:opacity-50">
-              <Upload className="w-3.5 h-3.5"/> {uploading ? 'Uploading…' : 'Upload video'}
-            </button>
-            <button onClick={() => setLinkMode(true)}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-sand-200 text-sand-600 hover:bg-sand-50 transition-colors">
-              <Link className="w-3.5 h-3.5"/> Paste link
-            </button>
-            <input ref={fileRef} type="file" accept="video/*" className="hidden"
-              onChange={e => e.target.files[0] && onVideoUpload(block, e.target.files[0])}/>
-          </div>
+          <button onClick={() => setLinkMode(true)}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-dashed border-sand-200 text-sand-500 hover:bg-sand-50 hover:border-sand-300 transition-colors w-full">
+            <Link className="w-3.5 h-3.5"/> Paste recording link (Zoom, Loom or Drive)
+          </button>
         )}
       </div>
 
