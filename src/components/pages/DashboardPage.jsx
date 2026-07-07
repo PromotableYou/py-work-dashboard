@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CheckSquare, Calendar, Lightbulb, Brain, Clock, ArrowRight,
-  TrendingUp, Zap, Star, AlertCircle, Flame, AlertTriangle,
+  TrendingUp, Zap, Star, AlertCircle, Flame, AlertTriangle, Video, ExternalLink, CheckCircle2,
 } from 'lucide-react'
-import { getTasks, getProjects, getSubtasks, getDumps, getIdeas, getTimelog } from '../../lib/supabase'
+import { getTasks, getProjects, getSubtasks, getDumps, getIdeas, getTimelog, getUnreviewedVideos, markVideoReviewed } from '../../lib/supabase'
 import { getStreak } from './TasksPage'
 import QuickLinks from '../QuickLinks'
 
@@ -164,9 +164,10 @@ function dueDiff(dueDate) {
 }
 
 export default function DashboardPage({ workspace = 'shaniah' }) {
-  const [data, setData]     = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState(null)
+  const [data, setData]             = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
+  const [unreviewedVideos, setVideos] = useState([])
 
   useEffect(() => {
     Promise.all([getTasks(workspace), getProjects(workspace), getSubtasks(workspace), getDumps(workspace), getIdeas(workspace), getTimelog(workspace)])
@@ -176,6 +177,19 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [workspace])
+
+  useEffect(() => {
+    if (workspace === 'shaniah') {
+      getUnreviewedVideos().then(setVideos).catch(() => {})
+    }
+  }, [workspace])
+
+  async function handleMarkReviewed(id) {
+    try {
+      await markVideoReviewed(id)
+      setVideos(v => v.filter(x => x.id !== id))
+    } catch { /* graceful */ }
+  }
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -208,7 +222,8 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
   }
   const weekTimelog = timelog.filter(t => t.date >= weekStart)
   const weekHours   = weekTimelog.reduce((s, t) => s + calcHours(t), 0)
-  const TARGET_WEEK = 38
+  const WEEKLY_TARGETS = { shaniah: 38, stacey: 38, em: 38, william: 38, tanya: 29, tanaz: 38 }
+  const TARGET_WEEK = WEEKLY_TARGETS[workspace] ?? 38
   const hoursProgress = Math.min((weekHours / TARGET_WEEK) * 100, 100)
 
   // Projects with progress
@@ -280,7 +295,37 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
       </div>
 
       {/* ── Quick Links ── */}
-      <QuickLinks workspace={workspace} />
+      {!['tanya', 'tanaz'].includes(workspace) && <QuickLinks workspace={workspace} />}
+
+      {/* ── Video upload notifications (Shaniah only) ── */}
+      {workspace === 'shaniah' && unreviewedVideos.length > 0 && (
+        <div className="bg-violet-50 border border-violet-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 bg-violet-100 border-b border-violet-200 flex items-center gap-2">
+            <Video className="w-4 h-4 text-violet-600"/>
+            <p className="text-xs font-bold text-violet-700 uppercase tracking-widest flex-1">New coach recordings</p>
+            <span className="text-xs font-bold text-violet-600 bg-violet-200 rounded-full px-2 py-0.5">{unreviewedVideos.length}</span>
+          </div>
+          <div className="divide-y divide-violet-100">
+            {unreviewedVideos.map(v => (
+              <div key={v.id} className="flex items-center gap-3 px-5 py-3">
+                <Video className="w-4 h-4 text-violet-400 shrink-0"/>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-sand-900">{v.coach_name} — {v.session_name}</p>
+                  <p className="text-xs text-sand-400">{v.session_date}</p>
+                </div>
+                <a href={v.video_url} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800 font-medium">
+                  View <ExternalLink className="w-3 h-3"/>
+                </a>
+                <button onClick={() => handleMarkReviewed(v.id)}
+                  className="flex items-center gap-1 text-xs text-sand-400 hover:text-green-600 font-medium ml-2 transition-colors">
+                  <CheckCircle2 className="w-4 h-4"/> Done
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Overdue / due soon alert ── */}
       {(overdue.length > 0 || dueSoon.length > 0) && (

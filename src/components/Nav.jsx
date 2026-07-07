@@ -1,13 +1,13 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList, ChevronDown, Video } from 'lucide-react'
-import { getUnapprovedCoachLogsCount } from '../lib/supabase'
+import { getUnapprovedCoachLogsCount, getUnreviewedVideos } from '../lib/supabase'
 
 const WORKSPACES = [
   {
     slug: 'shaniah', label: 'Shaniah', home: '/',
     links: [
-      { to: '/',                 icon: LayoutDashboard, label: 'Dashboard',   end: true },
+      { to: '/',                 icon: LayoutDashboard, label: 'Dashboard',   end: true, videoBadge: true },
       { to: '/tasks',            icon: CheckSquare,     label: 'Tasks'       },
       { to: '/calendar',         icon: Calendar,        label: 'Calendar'    },
       { to: '/meetings',         icon: CalendarDays,    label: 'Meetings'    },
@@ -106,8 +106,9 @@ export default function Nav() {
   const current      = WORKSPACES.find(w => w.slug === currentSlug)
   const links        = current?.links || WORKSPACES[0].links
 
-  const [open, setOpen]             = useState(false)
+  const [open, setOpen]                 = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  const [videoCount, setVideoCount]     = useState(0)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -115,6 +116,16 @@ export default function Nav() {
     const interval = setInterval(() => getUnapprovedCoachLogsCount().then(setPendingCount), 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (currentSlug === 'shaniah') {
+      getUnreviewedVideos().then(videos => setVideoCount(videos.length)).catch(() => {})
+      const iv = setInterval(() => getUnreviewedVideos().then(v => setVideoCount(v.length)).catch(() => {}), 5 * 60 * 1000)
+      return () => clearInterval(iv)
+    } else {
+      setVideoCount(0)
+    }
+  }, [currentSlug])
 
   useEffect(() => {
     function handleClick(e) {
@@ -162,8 +173,9 @@ export default function Nav() {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto">
-          {links.map(({ to, icon: Icon, label, end, badge }) => {
+          {links.map(({ to, icon: Icon, label, end, badge, videoBadge }) => {
             const showBadge = badge && pendingCount > 0
+            const showVideo = videoBadge && videoCount > 0
             return (
               <NavLink
                 key={to}
@@ -184,6 +196,11 @@ export default function Nav() {
                     {pendingCount > 9 ? '9+' : pendingCount}
                   </span>
                 )}
+                {showVideo && (
+                  <span className="min-w-[18px] h-[18px] bg-violet-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shrink-0">
+                    {videoCount > 9 ? '9+' : videoCount}
+                  </span>
+                )}
               </NavLink>
             )
           })}
@@ -198,8 +215,9 @@ export default function Nav() {
 
       {/* Mobile bottom nav */}
       <nav className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-sand-200 z-40 flex overflow-x-auto">
-        {links.map(({ to, icon: Icon, label, end, badge }) => {
+        {links.map(({ to, icon: Icon, label, end, badge, videoBadge }) => {
           const showBadge = badge && pendingCount > 0
+          const showVideo = videoBadge && videoCount > 0
           return (
             <NavLink
               key={to}
@@ -215,6 +233,9 @@ export default function Nav() {
                 <Icon className="w-5 h-5" />
                 {showBadge && (
                   <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white" />
+                )}
+                {showVideo && !showBadge && (
+                  <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-violet-500 rounded-full border-2 border-white" />
                 )}
               </div>
               {label.split(' ')[0]}

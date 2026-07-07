@@ -31,6 +31,34 @@ export async function deleteTask(id) {
   const { error } = await supabase.from('wd_tasks').delete().eq('id', id)
   if (error) throw error
 }
+export async function getAssignedTasks(workspace) {
+  const { data, error } = await supabase
+    .from('wd_tasks').select('*').eq('assigned_to', workspace)
+    .order('created_at', { ascending: false })
+  if (error) return [] // graceful if column doesn't exist yet
+  return data
+}
+export async function addAssignedTask(task) {
+  const { data, error } = await supabase
+    .from('wd_tasks').insert([task]).select().single()
+  if (error) throw error
+  return data
+}
+export async function getUnreviewedVideos() {
+  const { data, error } = await supabase
+    .from('wd_session_checkins').select('*')
+    .not('video_url', 'is', null)
+    .neq('video_url', '')
+    .eq('video_reviewed', false)
+    .order('session_date', { ascending: false })
+  if (error) return []
+  return data
+}
+export async function markVideoReviewed(id) {
+  const { error } = await supabase
+    .from('wd_session_checkins').update({ video_reviewed: true }).eq('id', id)
+  if (error) throw error
+}
 
 // ─── PROJECTS ────────────────────────────────────────────────────────────────
 export async function getProjects(workspace = 'shaniah') {

@@ -3,14 +3,21 @@ import {
   Plus, Check, Trash2, FileText, ChevronDown, ChevronUp,
   AlertCircle, Circle, GripVertical, X, RefreshCw,
   Timer, Pause, Play, RotateCcw, Palette, Calendar,
-  LayoutList, LayoutGrid,
+  LayoutList, LayoutGrid, UserPlus, Inbox,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
   getProjects, addProject, updateProject, deleteProject,
   getSubtasks, addSubtask, updateSubtask, deleteSubtask,
   getRecurringTasks, addRecurringTask, deleteRecurringTask,
+  getAssignedTasks, addAssignedTask, updateTask, deleteTask,
 } from '../../lib/supabase'
+
+const WORKSPACE_NAMES = {
+  shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em',
+  william: 'William', tanya: 'Tanya', tanaz: 'Tanaz',
+}
+const ASSIGNABLE_WORKSPACES = ['shaniah', 'stacey', 'em', 'william', 'tanya', 'tanaz']
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 const PROJECT_COLORS = [
@@ -662,21 +669,142 @@ function Notepad({ subtasks, onToggleSub, recurringTasks, onAddRecurring, onDele
   )
 }
 
+// ─── Assigned tasks inbox ─────────────────────────────────────────────────────
+function AssignedInbox({ tasks, onDone, onDelete }) {
+  const incomplete = tasks.filter(t => !t.completed)
+  const complete   = tasks.filter(t => t.completed)
+  const [showDone, setShowDone] = useState(false)
+
+  if (tasks.length === 0) return null
+
+  return (
+    <div className="bg-white border-2 border-blush-200 rounded-2xl overflow-hidden mb-5">
+      <div className="px-5 py-3 bg-blush-50 border-b border-blush-100 flex items-center gap-2">
+        <Inbox className="w-4 h-4 text-blush-500"/>
+        <h3 className="text-xs font-bold text-blush-700 uppercase tracking-widest flex-1">Assigned to you</h3>
+        <span className="text-xs font-bold text-blush-500 bg-blush-100 rounded-full px-2 py-0.5">{incomplete.length}</span>
+      </div>
+      <div className="divide-y divide-sand-100">
+        {incomplete.map(t => <AssignedRow key={t.id} task={t} onDone={onDone} onDelete={onDelete}/>)}
+        {complete.length > 0 && (
+          <>
+            <button onClick={() => setShowDone(s => !s)} className="w-full flex items-center justify-between px-5 py-2 text-xs text-sand-400 hover:text-sand-600 bg-sand-50">
+              <span>{complete.length} completed</span>
+              {showDone ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>}
+            </button>
+            {showDone && complete.map(t => <AssignedRow key={t.id} task={t} onDone={onDone} onDelete={onDelete}/>)}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AssignedRow({ task, onDone, onDelete }) {
+  const due = dueBadge(task.due_date)
+  const fromName = WORKSPACE_NAMES[task.assigned_by] || task.assigned_by
+  return (
+    <div className={`group flex items-start gap-3 px-5 py-3 hover:bg-sand-50 transition-colors ${task.completed ? 'opacity-60' : ''}`}>
+      <button onClick={() => onDone(task.id, !task.completed)}
+        className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${task.completed ? 'bg-blush-400 border-blush-400' : 'border-sand-300 hover:border-blush-400'}`}>
+        {task.completed && <Check className="w-2.5 h-2.5 text-white"/>}
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm ${task.completed ? 'line-through text-sand-400' : 'text-sand-800'}`}>{task.text}</p>
+        {task.assign_message && <p className="text-xs text-sand-400 mt-0.5 italic">"{task.assign_message}"</p>}
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {fromName && (
+            <span className="text-[10px] font-semibold text-blush-600 bg-blush-50 border border-blush-200 rounded-full px-2 py-0.5">
+              from {fromName}
+            </span>
+          )}
+          {due && <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${due.cls}`}>{due.label}</span>}
+        </div>
+      </div>
+      <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-sand-300 hover:text-red-400 transition-all shrink-0 mt-0.5">
+        <Trash2 className="w-3.5 h-3.5"/>
+      </button>
+    </div>
+  )
+}
+
+// ─── Assign task form ─────────────────────────────────────────────────────────
+function AssignTaskForm({ fromWorkspace, onAssign, onClose }) {
+  const [form, setForm] = useState({ assignTo: '', text: '', message: '', due: '' })
+  const others = ASSIGNABLE_WORKSPACES.filter(w => w !== fromWorkspace)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.assignTo || !form.text.trim()) return
+    await onAssign({
+      text: form.text.trim(),
+      workspace: form.assignTo,
+      assigned_to: form.assignTo,
+      assigned_by: fromWorkspace,
+      assign_message: form.message.trim() || null,
+      due_date: form.due || null,
+      completed: false,
+    })
+    onClose()
+  }
+
+  return (
+    <div className="bg-white border-2 border-blush-200 rounded-2xl p-5 space-y-3 mb-5">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-sand-900 text-sm flex items-center gap-2">
+          <UserPlus className="w-4 h-4 text-blush-500"/> Assign a task
+        </h3>
+        <button onClick={onClose} className="text-sand-300 hover:text-sand-500"><X className="w-4 h-4"/></button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="flex gap-2">
+          <select value={form.assignTo} onChange={e => setForm(f => ({ ...f, assignTo: e.target.value }))} required
+            className="flex-1 text-sm bg-sand-50 border border-sand-200 rounded-xl px-3 py-2.5 text-sand-800 focus:ring-2 focus:ring-blush-200 focus:outline-none">
+            <option value="">Assign to…</option>
+            {others.map(w => <option key={w} value={w}>{WORKSPACE_NAMES[w]}</option>)}
+          </select>
+          <input type="date" value={form.due} onChange={e => setForm(f => ({ ...f, due: e.target.value }))}
+            className="text-sm bg-sand-50 border border-sand-200 rounded-xl px-3 py-2.5 text-sand-800 focus:ring-2 focus:ring-blush-200 focus:outline-none"/>
+        </div>
+        <input value={form.text} onChange={e => setForm(f => ({ ...f, text: e.target.value }))}
+          placeholder="Task description…" required autoFocus
+          className="w-full text-sm bg-sand-50 border border-sand-200 rounded-xl px-4 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-blush-200 focus:outline-none"/>
+        <input value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+          placeholder="Add a note (optional)…"
+          className="w-full text-sm bg-sand-50 border border-sand-200 rounded-xl px-4 py-2.5 text-sand-800 placeholder-sand-400 focus:ring-2 focus:ring-blush-200 focus:outline-none"/>
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose}
+            className="flex-1 text-sm text-sand-500 py-2 rounded-xl border border-sand-200 hover:bg-sand-50 transition-colors">Cancel</button>
+          <button type="submit"
+            className="flex-1 text-sm bg-blush-500 hover:bg-blush-600 text-white py-2 rounded-xl font-semibold transition-colors">Assign Task</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function TasksPage({ workspace = 'shaniah' }) {
-  const [projects, setProjects]       = useState([])
-  const [subtasks, setSubtasks]       = useState([])
-  const [recurring, setRecurring]     = useState([])
-  const [focusIds, setFocusIds]       = useState(getFocusIds)
-  const [loading, setLoading]         = useState(true)
-  const [error, setError]             = useState(null)
-  const [showAddProject, setShowAdd]  = useState(false)
-  const [newProject, setNewProject]   = useState({ name: '', priority: 'medium', due_date: '', color: '#F0457A' })
-  const [view, setView]               = useState(() => localStorage.getItem(VIEW_KEY) || 'list')
+  const [projects, setProjects]         = useState([])
+  const [subtasks, setSubtasks]         = useState([])
+  const [recurring, setRecurring]       = useState([])
+  const [assignedTasks, setAssigned]    = useState([])
+  const [focusIds, setFocusIds]         = useState(getFocusIds)
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState(null)
+  const [showAddProject, setShowAdd]    = useState(false)
+  const [showAssignForm, setShowAssign] = useState(false)
+  const [newProject, setNewProject]     = useState({ name: '', priority: 'medium', due_date: '', color: '#F0457A' })
+  const [view, setView]                 = useState(() => localStorage.getItem(VIEW_KEY) || 'list')
+
+  const canAssign = ['shaniah', 'stacey'].includes(workspace)
 
   useEffect(() => {
-    Promise.all([getProjects(workspace), getSubtasks(workspace), getRecurringTasks(workspace)])
-      .then(([p, s, r]) => { setProjects(p); setSubtasks(s); setRecurring(r) })
+    Promise.all([
+      getProjects(workspace), getSubtasks(workspace),
+      getRecurringTasks(workspace), getAssignedTasks(workspace),
+    ])
+      .then(([p, s, r, a]) => { setProjects(p); setSubtasks(s); setRecurring(r); setAssigned(a) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -745,6 +873,26 @@ export default function TasksPage({ workspace = 'shaniah' }) {
     catch (e) { setError(e.message) }
   }
 
+  async function handleAssignTask(task) {
+    try {
+      const saved = await addAssignedTask(task)
+      // if they assigned to themselves, add to assigned inbox
+      if (task.assigned_to === workspace) setAssigned(p => [saved, ...p])
+    } catch (e) { setError(e.message) }
+  }
+  async function handleDoneAssigned(id, done) {
+    try {
+      await updateTask(id, { completed: done })
+      setAssigned(p => p.map(t => t.id === id ? { ...t, completed: done } : t))
+    } catch (e) { setError(e.message) }
+  }
+  async function handleDeleteAssigned(id) {
+    try {
+      await deleteTask(id)
+      setAssigned(p => p.filter(t => t.id !== id))
+    } catch (e) { setError(e.message) }
+  }
+
   async function handleMoveStatus(projectId, newStatus) {
     const id = parseInt(projectId, 10) || projectId
     const nowDone = newStatus === 'done'
@@ -786,6 +934,12 @@ export default function TasksPage({ workspace = 'shaniah' }) {
               <LayoutGrid className="w-3.5 h-3.5" /> Board
             </button>
           </div>
+          {canAssign && (
+            <button onClick={() => setShowAssign(s => !s)}
+              className="flex items-center gap-2 bg-sand-100 hover:bg-sand-200 text-sand-700 text-sm font-medium px-4 py-2 rounded-xl transition-colors">
+              <UserPlus className="w-4 h-4" /> Assign
+            </button>
+          )}
           <button onClick={() => setShowAdd(!showAddProject)}
             className="flex items-center gap-2 bg-blush-500 hover:bg-blush-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
             <Plus className="w-4 h-4" /> New Project
@@ -798,6 +952,14 @@ export default function TasksPage({ workspace = 'shaniah' }) {
           <AlertCircle className="w-4 h-4 shrink-0" />{error}
         </div>
       )}
+
+      {/* ── Assign form ── */}
+      {showAssignForm && canAssign && (
+        <AssignTaskForm fromWorkspace={workspace} onAssign={handleAssignTask} onClose={() => setShowAssign(false)}/>
+      )}
+
+      {/* ── Assigned to me inbox ── */}
+      <AssignedInbox tasks={assignedTasks} onDone={handleDoneAssigned} onDelete={handleDeleteAssigned}/>
 
       {/* ── Add project form (shared between views) ── */}
       {showAddProject && (
