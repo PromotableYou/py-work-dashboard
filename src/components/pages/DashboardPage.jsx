@@ -18,7 +18,10 @@ const WORKSPACE_CONFIG = {
 }
 
 function gcalAgenda(email) {
-  return `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(email)}&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=DAY`
+  const now = new Date()
+  const pad = n => String(n).padStart(2, '0')
+  const d = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`
+  return `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(email)}&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA&dates=${d}%2F${d}`
 }
 
 function localISO(date = new Date()) {
