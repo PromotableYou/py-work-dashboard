@@ -607,6 +607,9 @@ export async function uploadSessionVideo(file, coachName, sessionDate, sessionNa
 // The browser uploads directly to Drive (no Supabase bandwidth used).
 // onProgress(0-100) is called during the upload.
 export async function uploadVideoToDrive(file, coachName, sessionDate, sessionName, onProgress) {
+  // Show 0% immediately so the user knows something is happening
+  onProgress?.(0)
+
   // Step 1 — get a resumable upload URL from the edge function
   const { data: initData, error: initError } = await supabase.functions.invoke('drive-init-upload', {
     body: {
@@ -619,7 +622,9 @@ export async function uploadVideoToDrive(file, coachName, sessionDate, sessionNa
     },
   })
   if (initError) throw new Error(`Drive init: ${initError.message}`)
-  if (initData?.error) throw new Error(`Drive init: ${initData.error}`)
+  if (!initData || typeof initData !== 'object') throw new Error(`Drive init: unexpected response`)
+  if (initData.error) throw new Error(`Drive init: ${initData.error}`)
+  if (!initData.uploadUrl) throw new Error(`Drive init: no upload URL returned`)
   const { uploadUrl } = initData
 
   // Step 2 — upload file directly to Drive from the browser

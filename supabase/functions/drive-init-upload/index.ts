@@ -56,7 +56,7 @@ async function findOrCreateFolder(token: string, name: string, parentId?: string
     : `name='${safe}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
 
   const search = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
     { headers: { Authorization: `Bearer ${token}` } }
   )
   const { files } = await search.json()
@@ -65,7 +65,7 @@ async function findOrCreateFolder(token: string, name: string, parentId?: string
   const body: Record<string, unknown> = { name, mimeType: 'application/vnd.google-apps.folder' }
   if (parentId) body.parents = [parentId]
 
-  const create = await fetch('https://www.googleapis.com/drive/v3/files', {
+  const create = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -87,17 +87,15 @@ serve(async (req) => {
     const saJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')
     if (!saJson) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON secret not set')
 
-    const token   = await getGoogleToken(JSON.parse(saJson))
-    const rootId  = await findOrCreateFolder(token, 'Session Recordings')
-    const coachId = await findOrCreateFolder(token, coachName, rootId)
-    const monthId = await findOrCreateFolder(token, sessionDate.slice(0, 7), coachId)
+    const token  = await getGoogleToken(JSON.parse(saJson))
+    const folderId = '11hu2uWPyyZ4mFXaVNwYAjf5fbra5M-ZR'
 
-    const safe      = sessionName.replace(/[^a-z0-9]/gi, '-').toLowerCase().slice(0, 60)
+    const safe      = `${coachName}-${sessionDate}-${sessionName.replace(/[^a-z0-9]/gi, '-').toLowerCase().slice(0, 40)}`
     const ext       = fileName.includes('.') ? fileName.split('.').pop() : 'mp4'
-    const driveName = `${sessionDate}-${safe}.${ext}`
+    const driveName = `${safe}.${ext}`
 
     const initRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
       {
         method: 'POST',
         headers: {
@@ -106,7 +104,7 @@ serve(async (req) => {
           'X-Upload-Content-Type': contentType || 'video/mp4',
           'X-Upload-Content-Length': String(size),
         },
-        body: JSON.stringify({ name: driveName, parents: [monthId] }),
+        body: JSON.stringify({ name: driveName, parents: [folderId] }),
       }
     )
 
