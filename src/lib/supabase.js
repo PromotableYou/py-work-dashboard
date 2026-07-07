@@ -648,12 +648,5 @@ export async function uploadVideoToDrive(file, coachName, sessionDate, sessionNa
     xhr.send(file)
   })
 
-  // Step 3 — make the file public and get the shareable link
-  const { data: shareData, error: shareError } = await supabase.functions.invoke('drive-share-file', {
-    body: { fileId },
-  })
-  if (shareError) throw new Error(`Drive share: ${shareError.message}`)
-  if (shareData?.error) throw new Error(`Drive share: ${shareData.error}`)
-
-  return shareData.shareUrl
+  return `https://drive.google.com/file/d/${fileId}/view`
 }
