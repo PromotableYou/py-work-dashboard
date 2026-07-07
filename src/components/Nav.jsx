@@ -67,7 +67,6 @@ const WORKSPACES = [
     links: [
       { to: '/tanya',           icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/tanya/tasks',     icon: CheckSquare,     label: 'Tasks'       },
-      { to: '/tanya/calendar',  icon: Calendar,        label: 'Calendar'    },
       { to: '/tanya/sessions',  icon: Video,           label: 'Sessions'    },
       { to: '/tanya/notes',     icon: StickyNote,      label: 'Notes'       },
       { to: '/tanya/ideas',     icon: Lightbulb,       label: 'Ideas'       },
@@ -80,7 +79,6 @@ const WORKSPACES = [
     links: [
       { to: '/tanaz',           icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/tanaz/tasks',     icon: CheckSquare,     label: 'Tasks'       },
-      { to: '/tanaz/calendar',  icon: Calendar,        label: 'Calendar'    },
       { to: '/tanaz/sessions',  icon: Video,           label: 'Sessions'    },
       { to: '/tanaz/notes',     icon: StickyNote,      label: 'Notes'       },
       { to: '/tanaz/ideas',     icon: Lightbulb,       label: 'Ideas'       },
