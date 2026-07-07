@@ -648,16 +648,16 @@ export default function SessionsPage({ workspace = 'tanya' }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-xs font-bold text-sand-500 uppercase tracking-widest">Clarity Calls</h2>
-            {clarityCheckins.length > 0 && (
+            {clarityCheckins.filter(c => !c.loom_uploaded || !c.email_sent).length > 0 && (
               <span className="text-[10px] font-bold bg-violet-100 text-violet-600 rounded-full px-2 py-0.5">
-                {clarityCheckins.filter(c => !c.loom_uploaded || !c.email_sent).length} pending
+                {clarityCheckins.filter(c => !c.loom_uploaded || !c.email_sent).length} to action
               </span>
             )}
           </div>
           {!showLogForm && (
             <button onClick={() => setShowLogForm(true)}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 rounded-xl transition-colors">
-              <Plus className="w-3.5 h-3.5"/> Log a call
+              className="text-[10px] text-sand-400 hover:text-sand-600 underline transition-colors">
+              + add manually
             </button>
           )}
         </div>
@@ -671,12 +671,9 @@ export default function SessionsPage({ workspace = 'tanya' }) {
         )}
 
         {clarityCheckins.length === 0 && !showLogForm ? (
-          <div className="bg-white border border-sand-200 rounded-2xl px-4 py-8 text-center">
-            <PhoneCall className="w-6 h-6 text-sand-300 mx-auto mb-2"/>
-            <p className="text-sm text-sand-400">No clarity calls logged yet</p>
-            <button onClick={() => setShowLogForm(true)} className="text-violet-500 text-xs font-medium mt-1 hover:text-violet-700">
-              Log your first call →
-            </button>
+          <div className="bg-white border border-sand-200 rounded-2xl px-4 py-6 text-center">
+            <PhoneCall className="w-5 h-5 text-sand-300 mx-auto mb-2"/>
+            <p className="text-sm text-sand-400">No clarity calls yet — they'll appear here automatically from your calendar</p>
           </div>
         ) : (
           <div className="space-y-3">
