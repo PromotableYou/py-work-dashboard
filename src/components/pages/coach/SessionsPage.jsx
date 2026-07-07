@@ -19,6 +19,30 @@ function blockToDate(block) {
   const ws = new Date(block.week_start + 'T00:00:00')
   return addDays(ws, DAY_OFFSET[block.day_key] ?? 0)
 }
+function parseSessionMinutes(timeStr) {
+  if (!timeStr) return null
+  const clean = timeStr.trim().toLowerCase().replace(/\s/g, '')
+  const m = clean.match(/^(\d+):?(\d*)([ap]m)$/)
+  if (!m) return null
+  let h = parseInt(m[1])
+  const mins = m[2] ? parseInt(m[2]) : 0
+  if (m[3] === 'pm' && h < 12) h += 12
+  if (m[3] === 'am' && h === 12) h = 0
+  return h * 60 + mins
+}
+
+function isSessionPast(block) {
+  const blockISO = toISO(blockToDate(block))
+  const todayISO = toISO(new Date())
+  if (blockISO < todayISO) return true
+  if (blockISO > todayISO) return false
+  // Same day — check if session time has passed (allow 30 min buffer)
+  const sessionMins = parseSessionMinutes(block.time)
+  const nowMins = new Date().getHours() * 60 + new Date().getMinutes()
+  if (sessionMins === null) return nowMins >= 13 * 60 // no time: assume past after 1pm
+  return nowMins > sessionMins + 30
+}
+
 function friendlyDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   return d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -355,11 +379,11 @@ export default function SessionsPage({ workspace = 'tanya' }) {
   }
 
   const upcoming = blocks
-    .filter(b => toISO(blockToDate(b)) >= today)
+    .filter(b => !isSessionPast(b))
     .sort((a, b) => blockToDate(a) - blockToDate(b))
 
   const past = blocks
-    .filter(b => toISO(blockToDate(b)) < today)
+    .filter(b => isSessionPast(b))
     .sort((a, b) => blockToDate(b) - blockToDate(a))
 
   if (loading) return (
