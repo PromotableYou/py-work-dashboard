@@ -39,7 +39,6 @@ const WORKSPACES = [
     links: [
       { to: '/em',                 icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/em/tasks',           icon: CheckSquare,     label: 'Tasks'       },
-      { to: '/em/calendar',        icon: Calendar,        label: 'Calendar'    },
       { to: '/em/meetings',        icon: CalendarDays,    label: 'Meetings'    },
       { to: '/em/coaches-calendar',icon: CalendarRange,   label: 'Coaches Cal' },
       { to: '/em/roster',          icon: ClipboardList,   label: 'Roster'      },
@@ -53,7 +52,6 @@ const WORKSPACES = [
     links: [
       { to: '/william',                 icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/william/tasks',           icon: CheckSquare,     label: 'Tasks'       },
-      { to: '/william/calendar',        icon: Calendar,        label: 'Calendar'    },
       { to: '/william/meetings',        icon: CalendarDays,    label: 'Meetings'    },
       { to: '/william/coaches-calendar',icon: CalendarRange,   label: 'Coaches Cal' },
       { to: '/william/roster',          icon: ClipboardList,   label: 'Roster'      },
