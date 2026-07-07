@@ -478,7 +478,7 @@ export default function SessionsPage({ workspace = 'tanya' }) {
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
 
         {/* Past sessions — narrow left column */}
         <div className="space-y-3">
@@ -499,7 +499,7 @@ export default function SessionsPage({ workspace = 'tanya' }) {
         </div>
 
         {/* Upcoming — wide right column */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           <h2 className="text-xs font-bold text-sand-500 uppercase tracking-widest">Upcoming</h2>
           {upcoming.length === 0 ? (
             <p className="text-sm text-sand-400 bg-white border border-sand-200 rounded-2xl px-4 py-8 text-center">No upcoming sessions in the next 2 weeks</p>
