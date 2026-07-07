@@ -738,6 +738,7 @@ function AssignTaskForm({ fromWorkspace, onAssign, onClose }) {
     if (!form.assignTo || !form.text.trim()) return
     await onAssign({
       text: form.text.trim(),
+      type: 'assigned',
       workspace: form.assignTo,
       assigned_to: form.assignTo,
       assigned_by: fromWorkspace,
