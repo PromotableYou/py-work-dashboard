@@ -540,3 +540,37 @@ export async function deleteSessionType(id) {
   const { error } = await supabase.from('wd_session_types').delete().eq('id', id)
   if (error) throw error
 }
+
+// ─── SESSION CHECKINS ─────────────────────────────────────────────────────────
+export async function getCoachRosterBlocks(coachName) {
+  const { data, error } = await supabase
+    .from('wd_roster_blocks').select('*').eq('coach_name', coachName)
+  if (error) throw error
+  return data
+}
+export async function getSessionCheckins(coachName) {
+  const { data, error } = await supabase
+    .from('wd_session_checkins').select('*').eq('coach_name', coachName)
+    .order('session_date', { ascending: false })
+  if (error) throw error
+  return data
+}
+export async function upsertSessionCheckin(checkin) {
+  const { data, error } = await supabase
+    .from('wd_session_checkins')
+    .upsert([checkin], { onConflict: 'coach_name,session_date,session_name' })
+    .select().single()
+  if (error) throw error
+  return data
+}
+export async function uploadSessionVideo(file, coachName, sessionDate, sessionName) {
+  const ext = file.name.split('.').pop()
+  const safeName = sessionName.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+  const path = `${coachName.toLowerCase()}/${sessionDate}/${safeName}.${ext}`
+  const { data, error } = await supabase.storage
+    .from('session-videos').upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data: { publicUrl } } = supabase.storage
+    .from('session-videos').getPublicUrl(data.path)
+  return publicUrl
+}

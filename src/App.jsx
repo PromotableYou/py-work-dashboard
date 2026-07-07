@@ -15,6 +15,7 @@ import RosterPage from './components/pages/boss/RosterPage'
 import { useParams } from 'react-router-dom'
 import CoachLogPage from './components/pages/coach/CoachLogPage'
 import SimpleCoachLogPage from './components/pages/coach/SimpleCoachLogPage'
+import SessionsPage from './components/pages/coach/SessionsPage'
 import { coachBySlug } from './lib/coaches'
 
 // Dispatch to the right form based on coach slug
@@ -85,6 +86,7 @@ export default function App() {
                   <Route path="/tanya" element={<DashboardPage workspace="tanya" />} />
                   <Route path="/tanya/tasks" element={<TasksPage workspace="tanya" />} />
                   <Route path="/tanya/calendar" element={<CalendarPage calendarEmail="tanya@promotableyou.com.au" />} />
+                  <Route path="/tanya/sessions" element={<SessionsPage workspace="tanya" />} />
                   <Route path="/tanya/roster" element={<RosterPage readOnly />} />
                   <Route path="/tanya/notes" element={<NotesPage workspace="tanya" />} />
                   <Route path="/tanya/ideas" element={<IdeasPage workspace="tanya" />} />
@@ -94,6 +96,7 @@ export default function App() {
                   <Route path="/tanaz" element={<DashboardPage workspace="tanaz" />} />
                   <Route path="/tanaz/tasks" element={<TasksPage workspace="tanaz" />} />
                   <Route path="/tanaz/calendar" element={<CalendarPage calendarEmail="tanaz@promotableyou.com.au" />} />
+                  <Route path="/tanaz/sessions" element={<SessionsPage workspace="tanaz" />} />
                   <Route path="/tanaz/roster" element={<RosterPage readOnly />} />
                   <Route path="/tanaz/notes" element={<NotesPage workspace="tanaz" />} />
                   <Route path="/tanaz/ideas" element={<IdeasPage workspace="tanaz" />} />

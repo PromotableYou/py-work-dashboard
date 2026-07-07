@@ -1,6 +1,6 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList, ChevronDown, Video } from 'lucide-react'
 import { getUnapprovedCoachLogsCount } from '../lib/supabase'
 
 const WORKSPACES = [
@@ -68,6 +68,7 @@ const WORKSPACES = [
       { to: '/tanya',           icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/tanya/tasks',     icon: CheckSquare,     label: 'Tasks'       },
       { to: '/tanya/calendar',  icon: Calendar,        label: 'Calendar'    },
+      { to: '/tanya/sessions',  icon: Video,           label: 'Sessions'    },
       { to: '/tanya/roster',    icon: ClipboardList,   label: 'Roster'      },
       { to: '/tanya/notes',     icon: StickyNote,      label: 'Notes'       },
       { to: '/tanya/ideas',     icon: Lightbulb,       label: 'Ideas'       },
@@ -81,6 +82,7 @@ const WORKSPACES = [
       { to: '/tanaz',           icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/tanaz/tasks',     icon: CheckSquare,     label: 'Tasks'       },
       { to: '/tanaz/calendar',  icon: Calendar,        label: 'Calendar'    },
+      { to: '/tanaz/sessions',  icon: Video,           label: 'Sessions'    },
       { to: '/tanaz/roster',    icon: ClipboardList,   label: 'Roster'      },
       { to: '/tanaz/notes',     icon: StickyNote,      label: 'Notes'       },
       { to: '/tanaz/ideas',     icon: Lightbulb,       label: 'Ideas'       },
