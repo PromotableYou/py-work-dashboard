@@ -422,10 +422,10 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
       </div>
 
       {/* ── Main content grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
-        {/* Left col (1/2) */}
-        <div className="space-y-5">
+        {/* Left col (2/5) */}
+        <div className="space-y-5 lg:col-span-2">
 
           {/* Daily hours chart */}
           {timelog.length > 0 && (
@@ -526,8 +526,8 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
 
         </div>
 
-        {/* Right col (1/3) */}
-        <div className="space-y-5">
+        {/* Right col (3/5) */}
+        <div className="space-y-5 lg:col-span-3">
 
           {/* Upcoming events — live Google Calendar */}
           <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
