@@ -5,6 +5,7 @@ import {
   getSessionCheckins,
   upsertSessionCheckin,
   uploadSessionVideo,
+  uploadVideoToDrive,
 } from '../../../lib/supabase'
 
 const PERSON_LABEL = { tanya: 'Tanya', tanaz: 'Tanaz', shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em', william: 'William' }
@@ -278,6 +279,7 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
   const [linkInput,   setLinkInput]   = useState('')
   const [newFollowUp, setNewFollowUp] = useState('')
   const [addingFU,    setAddingFU]    = useState(false)
+  const [uploadPct,   setUploadPct]   = useState(null)
   const fileRef = useRef(null)
 
   const date      = toISO(blockToDate(block))
@@ -331,6 +333,19 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
             </a>
             <button onClick={() => onUpdate(block, { video_url: '' })} className="text-sand-300 hover:text-red-400"><X className="w-3.5 h-3.5"/></button>
           </div>
+        ) : uploadPct !== null ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-sand-500">
+              <span className="font-medium">Uploading to Google Drive…</span>
+              <span>{uploadPct}%</span>
+            </div>
+            <div className="w-full h-2 bg-sand-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blush-400 rounded-full transition-all duration-300"
+                style={{ width: `${uploadPct}%` }}
+              />
+            </div>
+          </div>
         ) : linkMode ? (
           <div className="flex gap-2">
             <input autoFocus value={linkInput} onChange={e => setLinkInput(e.target.value)}
@@ -341,10 +356,26 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
             <button onClick={() => setLinkMode(false)} className="text-sand-400 px-2"><X className="w-4 h-4"/></button>
           </div>
         ) : (
-          <button onClick={() => setLinkMode(true)}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-dashed border-sand-200 text-sand-500 hover:bg-sand-50 hover:border-sand-300 transition-colors w-full">
-            <Link className="w-3.5 h-3.5"/> Paste recording link (Zoom, Loom or Drive)
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-sand-200 text-sand-600 hover:bg-sand-50 transition-colors flex-1 justify-center"
+            >
+              <Upload className="w-3.5 h-3.5"/> Upload to Drive
+            </button>
+            <button
+              onClick={() => setLinkMode(true)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-dashed border-sand-200 text-sand-500 hover:bg-sand-50 hover:border-sand-300 transition-colors flex-1 justify-center"
+            >
+              <Link className="w-3.5 h-3.5"/> Paste link
+            </button>
+            <input
+              ref={fileRef} type="file" accept="video/*,.mp4,.mov,.avi,.mkv" className="hidden"
+              onChange={e => {
+                if (e.target.files?.[0]) onVideoUpload(block, e.target.files[0], setUploadPct)
+              }}
+            />
+          </div>
         )}
       </div>
 
@@ -544,14 +575,17 @@ export default function SessionsPage({ workspace = 'tanya' }) {
     } catch(e) { setError(e.message) }
   }
 
-  async function handleVideoUpload(block, file) {
+  async function handleVideoUpload(block, file, setUploadPct) {
     const date = toISO(blockToDate(block))
     const key  = checkinKey(date, block.session_name)
     setUploading(prev => ({ ...prev, [key]: true }))
     try {
-      const url = await uploadSessionVideo(file, coachName, date, block.session_name)
+      const url = await uploadVideoToDrive(file, coachName, date, block.session_name, setUploadPct)
       await handleUpdate(block, { video_url: url, video_reviewed: false })
-    } catch(e) { setError(e.message) }
+    } catch(e) {
+      setError(e.message)
+      setUploadPct?.(null)
+    }
     finally { setUploading(prev => ({ ...prev, [key]: false })) }
   }
 

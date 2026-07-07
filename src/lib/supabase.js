@@ -602,3 +602,53 @@ export async function uploadSessionVideo(file, coachName, sessionDate, sessionNa
     .from('session-videos').getPublicUrl(data.path)
   return publicUrl
 }
+
+// Upload a video to Google Drive via Supabase Edge Functions.
+// The browser uploads directly to Drive (no Supabase bandwidth used).
+// onProgress(0-100) is called during the upload.
+export async function uploadVideoToDrive(file, coachName, sessionDate, sessionName, onProgress) {
+  // Step 1 — get a resumable upload URL from the edge function
+  const { data: initData, error: initError } = await supabase.functions.invoke('drive-init-upload', {
+    body: {
+      coachName,
+      sessionDate,
+      sessionName,
+      fileName:    file.name,
+      contentType: file.type || 'video/mp4',
+      size:        file.size,
+    },
+  })
+  if (initError) throw new Error(`Drive init: ${initError.message}`)
+  if (initData?.error) throw new Error(`Drive init: ${initData.error}`)
+  const { uploadUrl } = initData
+
+  // Step 2 — upload file directly to Drive from the browser
+  const fileId = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', uploadUrl)
+    xhr.setRequestHeader('Content-Type', file.type || 'video/mp4')
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText).id) }
+        catch { reject(new Error('Could not parse Drive upload response')) }
+      } else {
+        reject(new Error(`Drive upload failed (${xhr.status}): ${xhr.responseText.slice(0, 200)}`))
+      }
+    }
+    xhr.onerror = () => reject(new Error('Network error during Drive upload'))
+    xhr.send(file)
+  })
+
+  // Step 3 — make the file public and get the shareable link
+  const { data: shareData, error: shareError } = await supabase.functions.invoke('drive-share-file', {
+    body: { fileId },
+  })
+  if (shareError) throw new Error(`Drive share: ${shareError.message}`)
+  if (shareData?.error) throw new Error(`Drive share: ${shareData.error}`)
+
+  return shareData.shareUrl
+}
