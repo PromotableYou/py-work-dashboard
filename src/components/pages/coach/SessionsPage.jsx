@@ -5,10 +5,10 @@ import {
   getSessionCheckins,
   upsertSessionCheckin,
   uploadSessionVideo,
-  uploadVideoToDrive,
 } from '../../../lib/supabase'
 
-const PERSON_LABEL = { tanya: 'Tanya', tanaz: 'Tanaz', shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em', william: 'William' }
+const PERSON_LABEL    = { tanya: 'Tanya', tanaz: 'Tanaz', shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em', william: 'William' }
+const DRIVE_FOLDER_URL = 'https://drive.google.com/drive/folders/11hu2uWPyyZ4mFXaVNwYAjf5fbra5M-ZR'
 const DAY_OFFSET   = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4 }
 
 const SESSION_QUESTIONS = {
@@ -274,13 +274,9 @@ function UpcomingCard({ block, checkin, onConfirm, onUpdate, onResourceUpload, u
 }
 
 // ─── Past group session card ───────────────────────────────────────────────────
-function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
-  const [linkMode,    setLinkMode]    = useState(false)
-  const [linkInput,   setLinkInput]   = useState('')
+function PastCard({ block, checkin, onUpdate }) {
   const [newFollowUp, setNewFollowUp] = useState('')
   const [addingFU,    setAddingFU]    = useState(false)
-  const [uploadPct,   setUploadPct]   = useState(null)
-  const fileRef = useRef(null)
 
   const date      = toISO(blockToDate(block))
   const attended  = checkin?.attended ?? null
@@ -288,11 +284,6 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
   const followUps = checkin?.follow_ups || []
   const isComplete = attended && videoUrl && (followUps.length===0 || followUps.every(f=>f.done))
 
-  async function saveLink() {
-    if (!linkInput.trim()) return
-    await onUpdate(block, { video_url: linkInput.trim() })
-    setLinkMode(false); setLinkInput('')
-  }
   async function addFollowUp() {
     if (!newFollowUp.trim()) return
     await onUpdate(block, { follow_ups: [...followUps, { id: Date.now().toString(), text: newFollowUp.trim(), done: false }] })
@@ -326,55 +317,33 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
       <div className="space-y-2">
         <p className="text-xs font-semibold text-sand-500 uppercase tracking-wide">Session Recording</p>
         {videoUrl ? (
-          <div className="flex items-center gap-2 bg-sand-50 rounded-xl px-3 py-2">
-            <Video className="w-4 h-4 text-blush-400 shrink-0"/>
-            <a href={videoUrl} target="_blank" rel="noreferrer" className="text-sm text-blush-600 hover:text-blush-700 flex-1 truncate flex items-center gap-1">
-              View recording <ExternalLink className="w-3 h-3 shrink-0"/>
-            </a>
-            <button onClick={() => onUpdate(block, { video_url: '' })} className="text-sand-300 hover:text-red-400"><X className="w-3.5 h-3.5"/></button>
-          </div>
-        ) : uploadPct !== null ? (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-sand-500">
-              <span className="font-medium">Uploading to Google Drive…</span>
-              <span>{uploadPct}%</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2 flex-1">
+              <Check className="w-4 h-4 text-green-500 shrink-0"/>
+              <span className="text-sm text-green-700 font-medium flex-1">Uploaded to Drive</span>
+              <a href={DRIVE_FOLDER_URL} target="_blank" rel="noreferrer" className="text-green-600 hover:text-green-700">
+                <ExternalLink className="w-3.5 h-3.5"/>
+              </a>
             </div>
-            <div className="w-full h-2 bg-sand-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blush-400 rounded-full transition-all duration-300"
-                style={{ width: `${uploadPct}%` }}
-              />
-            </div>
-          </div>
-        ) : linkMode ? (
-          <div className="flex gap-2">
-            <input autoFocus value={linkInput} onChange={e => setLinkInput(e.target.value)}
-              onKeyDown={e => { if (e.key==='Enter') saveLink(); if (e.key==='Escape') setLinkMode(false) }}
-              placeholder="Zoom cloud, Loom or Drive link…"
-              className="flex-1 text-sm border border-sand-200 rounded-xl px-3 py-2 outline-none focus:border-blush-300"/>
-            <button onClick={saveLink} className="px-3 py-2 bg-blush-500 text-white rounded-xl text-sm">Save</button>
-            <button onClick={() => setLinkMode(false)} className="text-sand-400 px-2"><X className="w-4 h-4"/></button>
+            <button onClick={() => onUpdate(block, { video_url: '' })} className="text-sand-300 hover:text-red-400 shrink-0"><X className="w-3.5 h-3.5"/></button>
           </div>
         ) : (
-          <div className="flex gap-2">
+          <div className="bg-sand-50 border border-sand-200 rounded-xl p-3 space-y-2.5">
+            <p className="text-xs text-sand-500">
+              Upload your recording to the team Drive folder, then tick below.
+            </p>
+            <a href={DRIVE_FOLDER_URL} target="_blank" rel="noreferrer"
+              className="flex items-center gap-1.5 text-xs font-medium text-blush-600 hover:text-blush-700 transition-colors">
+              <ExternalLink className="w-3.5 h-3.5"/> Open Drive folder
+            </a>
             <button
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-sand-200 text-sand-600 hover:bg-sand-50 transition-colors flex-1 justify-center"
+              onClick={() => onUpdate(block, { video_url: DRIVE_FOLDER_URL })}
+              className="flex items-center gap-2 w-full text-left group mt-1"
             >
-              <Upload className="w-3.5 h-3.5"/> Upload to Drive
+              <div className="w-5 h-5 rounded border-2 border-sand-300 group-hover:border-blush-400 flex items-center justify-center shrink-0 transition-colors">
+              </div>
+              <span className="text-sm text-sand-500 group-hover:text-sand-700 transition-colors">I've uploaded the recording</span>
             </button>
-            <button
-              onClick={() => setLinkMode(true)}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-dashed border-sand-200 text-sand-500 hover:bg-sand-50 hover:border-sand-300 transition-colors flex-1 justify-center"
-            >
-              <Link className="w-3.5 h-3.5"/> Paste link
-            </button>
-            <input
-              ref={fileRef} type="file" accept="video/*,.mp4,.mov,.avi,.mkv" className="hidden"
-              onChange={e => {
-                if (e.target.files?.[0]) onVideoUpload(block, e.target.files[0], setUploadPct)
-              }}
-            />
           </div>
         )}
       </div>
@@ -518,7 +487,6 @@ export default function SessionsPage({ workspace = 'tanya' }) {
   const [showLogForm,     setShowLogForm]     = useState(false)
   const [loading,         setLoading]         = useState(true)
   const [error,           setError]           = useState(null)
-  const [uploading,       setUploading]       = useState({})
   const [uploadingResource, setUploadingResource] = useState({})
 
   useEffect(() => {
@@ -573,20 +541,6 @@ export default function SessionsPage({ workspace = 'tanya' }) {
       })
       setCheckins(prev => ({ ...prev, [key]: saved }))
     } catch(e) { setError(e.message) }
-  }
-
-  async function handleVideoUpload(block, file, setUploadPct) {
-    const date = toISO(blockToDate(block))
-    const key  = checkinKey(date, block.session_name)
-    setUploading(prev => ({ ...prev, [key]: true }))
-    try {
-      const url = await uploadVideoToDrive(file, coachName, date, block.session_name, setUploadPct)
-      await handleUpdate(block, { video_url: url, video_reviewed: false })
-    } catch(e) {
-      setError(e.message)
-      setUploadPct?.(null)
-    }
-    finally { setUploading(prev => ({ ...prev, [key]: false })) }
   }
 
   async function handleResourceUpload(block, file) {
@@ -661,8 +615,7 @@ export default function SessionsPage({ workspace = 'tanya' }) {
             const key = checkinKey(toISO(blockToDate(b)), b.session_name)
             return (
               <PastCard key={b.id} block={b} checkin={getCheckin(b)}
-                onUpdate={handleUpdate} onVideoUpload={handleVideoUpload}
-                uploading={!!uploading[key]}
+                onUpdate={handleUpdate}
               />
             )
           })}
