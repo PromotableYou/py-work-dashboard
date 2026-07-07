@@ -320,9 +320,9 @@ function PastCard({ block, checkin, onUpdate }) {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2 flex-1">
               <Check className="w-4 h-4 text-green-500 shrink-0"/>
-              <span className="text-sm text-green-700 font-medium flex-1">Uploaded to Drive</span>
-              <a href={DRIVE_FOLDER_URL} target="_blank" rel="noreferrer" className="text-green-600 hover:text-green-700">
-                <ExternalLink className="w-3.5 h-3.5"/>
+              <a href={DRIVE_FOLDER_URL} target="_blank" rel="noreferrer"
+                className="text-sm text-green-700 font-medium flex-1 flex items-center gap-1.5 hover:text-green-800">
+                Uploaded to Drive <ExternalLink className="w-3 h-3 shrink-0"/>
               </a>
             </div>
             <button onClick={() => onUpdate(block, { video_url: '' })} className="text-sand-300 hover:text-red-400 shrink-0"><X className="w-3.5 h-3.5"/></button>
