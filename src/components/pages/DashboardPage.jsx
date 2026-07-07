@@ -18,7 +18,7 @@ const WORKSPACE_CONFIG = {
 }
 
 function gcalAgenda(email) {
-  return `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(email)}&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=AGENDA`
+  return `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(email)}&ctz=Australia%2FBrisbane&showTitle=0&showNav=0&showPrint=0&showTabs=0&showCalendars=0&showTz=0&mode=DAY`
 }
 
 function localISO(date = new Date()) {
@@ -419,10 +419,10 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
       </div>
 
       {/* ── Main content grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-        {/* Left col (2/3) */}
-        <div className="lg:col-span-2 space-y-5">
+        {/* Left col (1/2) */}
+        <div className="space-y-5">
 
           {/* Daily hours chart */}
           {timelog.length > 0 && (
@@ -443,7 +443,7 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
           )}
 
           {/* Projects overview */}
-          <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
+          <div className="bg-white border border-sand-200 rounded-2xl overflow-hidden" style={{ minHeight: 440 }}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-sand-100">
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4 text-blush-400" />
@@ -537,12 +537,12 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
                 Full view <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
-            <div className="overflow-hidden" style={{ height: 520 }}>
+            <div className="overflow-hidden" style={{ height: 440 }}>
               <iframe
                 src={gcalAgenda(WORKSPACE_CONFIG[workspace]?.email || 'shaniah@promotableyou.com.au')}
                 style={{ border: 0, marginTop: -46, display: 'block' }}
                 width="100%"
-                height="580"
+                height="500"
                 frameBorder="0"
                 scrolling="no"
                 title="Upcoming Events"
