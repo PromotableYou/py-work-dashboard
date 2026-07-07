@@ -470,54 +470,48 @@ export default function SessionsPage({ workspace = 'tanya' }) {
   )
 
   return (
-    <div className="pb-6">
-      <div className="mb-6">
+    <div className="space-y-6 pb-6">
+      <div>
         <h1 className="text-xl font-bold text-sand-900">My Sessions</h1>
         <p className="text-sand-400 text-sm mt-0.5">Your rostered coaching sessions</p>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>}
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+      {/* Upcoming */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-bold text-sand-500 uppercase tracking-widest">Upcoming</h2>
+        {upcoming.length === 0 ? (
+          <p className="text-sm text-sand-400 bg-white border border-sand-200 rounded-2xl px-4 py-8 text-center">No upcoming sessions in the next 2 weeks</p>
+        ) : (
+          upcoming.map(b => {
+            const key = checkinKey(toISO(blockToDate(b)), b.session_name)
+            return (
+              <UpcomingCard key={b.id} block={b} checkin={getCheckin(b)}
+                onConfirm={handleConfirm} onUpdate={handleUpdate}
+                onResourceUpload={handleResourceUpload}
+                uploadingResource={!!uploadingResource[key]}
+              />
+            )
+          })
+        )}
+      </div>
 
-        {/* Past sessions — narrow left column */}
+      {/* Recent sessions */}
+      {past.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-xs font-bold text-sand-500 uppercase tracking-widest">Recent Sessions</h2>
-          {past.length === 0 ? (
-            <p className="text-sm text-sand-400 bg-white border border-sand-200 rounded-2xl px-4 py-8 text-center">No recent sessions</p>
-          ) : (
-            past.map(b => {
-              const key = checkinKey(toISO(blockToDate(b)), b.session_name)
-              return (
-                <PastCard key={b.id} block={b} checkin={getCheckin(b)}
-                  onUpdate={handleUpdate} onVideoUpload={handleVideoUpload}
-                  uploading={!!uploading[key]}
-                />
-              )
-            })
-          )}
+          {past.map(b => {
+            const key = checkinKey(toISO(blockToDate(b)), b.session_name)
+            return (
+              <PastCard key={b.id} block={b} checkin={getCheckin(b)}
+                onUpdate={handleUpdate} onVideoUpload={handleVideoUpload}
+                uploading={!!uploading[key]}
+              />
+            )
+          })}
         </div>
-
-        {/* Upcoming — wide right column */}
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-xs font-bold text-sand-500 uppercase tracking-widest">Upcoming</h2>
-          {upcoming.length === 0 ? (
-            <p className="text-sm text-sand-400 bg-white border border-sand-200 rounded-2xl px-4 py-8 text-center">No upcoming sessions in the next 2 weeks</p>
-          ) : (
-            upcoming.map(b => {
-              const key = checkinKey(toISO(blockToDate(b)), b.session_name)
-              return (
-                <UpcomingCard key={b.id} block={b} checkin={getCheckin(b)}
-                  onConfirm={handleConfirm} onUpdate={handleUpdate}
-                  onResourceUpload={handleResourceUpload}
-                  uploadingResource={!!uploadingResource[key]}
-                />
-              )
-            })
-          )}
-        </div>
-
-      </div>
+      )}
     </div>
   )
 }
