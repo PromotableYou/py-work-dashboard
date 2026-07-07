@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Video, Check, X, Upload, Plus, Trash2, Link, ExternalLink, CheckCircle2, Circle, FileText, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Video, Check, X, Upload, Plus, Trash2, Link, ExternalLink, CheckCircle2, Circle, FileText, HelpCircle, ChevronDown, ChevronUp, Mail, PhoneCall } from 'lucide-react'
 import {
   getCoachRosterBlocks,
   getSessionCheckins,
@@ -25,12 +25,25 @@ function toISO(date) {
 }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate()+n); return d }
 function blockToDate(block) {
+  if (block._date) return new Date(block._date + 'T00:00:00')
   return addDays(new Date(block.week_start + 'T00:00:00'), DAY_OFFSET[block.day_key] ?? 0)
 }
 function friendlyDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 function checkinKey(date, name) { return `${date}||${name}` }
+
+function getWeekMon(dateISO) {
+  const d = new Date(dateISO + 'T12:00:00')
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  const mon = new Date(d); mon.setDate(d.getDate() + diff)
+  return toISO(mon)
+}
+function getDayKey(dateISO) {
+  const keys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+  return keys[new Date(dateISO + 'T12:00:00').getDay()] || 'mon'
+}
 
 function parseSessionMinutes(timeStr) {
   if (!timeStr) return null
@@ -119,7 +132,6 @@ function UpcomingCard({ block, checkin, onConfirm, onUpdate, onResourceUpload, u
 
   return (
     <div className={`bg-white border-2 rounded-2xl overflow-hidden ${confirmed===true ? 'border-green-300' : confirmed===false ? 'border-red-200' : 'border-blush-200'}`}>
-      {/* Main info */}
       <div className="p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
@@ -131,7 +143,6 @@ function UpcomingCard({ block, checkin, onConfirm, onUpdate, onResourceUpload, u
           {confirmed===false && <span className="shrink-0 text-xs font-bold text-red-500 bg-red-50 border border-red-200 rounded-full px-3 py-1">Not attending</span>}
         </div>
 
-        {/* Attendance confirmation */}
         {confirmed==null ? (
           <div>
             <p className="text-sm text-sand-500 mb-3">Will you be attending this session?</p>
@@ -153,7 +164,6 @@ function UpcomingCard({ block, checkin, onConfirm, onUpdate, onResourceUpload, u
         )}
       </div>
 
-      {/* Prep section toggle */}
       <button
         onClick={() => setShowPrep(p => !p)}
         className="w-full flex items-center justify-between px-5 py-3 bg-sand-50 border-t border-sand-100 text-xs font-bold text-sand-500 uppercase tracking-widest hover:bg-sand-100 transition-colors"
@@ -164,7 +174,6 @@ function UpcomingCard({ block, checkin, onConfirm, onUpdate, onResourceUpload, u
 
       {showPrep && (
         <div className="p-5 space-y-5 border-t border-sand-100">
-          {/* Topic */}
           <div>
             <p className="text-xs font-bold text-sand-500 uppercase tracking-wide mb-2">Session Topic</p>
             {editTopic ? (
@@ -183,7 +192,6 @@ function UpcomingCard({ block, checkin, onConfirm, onUpdate, onResourceUpload, u
             )}
           </div>
 
-          {/* Resources */}
           <div>
             <p className="text-xs font-bold text-sand-500 uppercase tracking-wide mb-2">Resources</p>
             {resources.map((r, i) => (
@@ -224,7 +232,6 @@ function UpcomingCard({ block, checkin, onConfirm, onUpdate, onResourceUpload, u
             )}
           </div>
 
-          {/* Questions */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-bold text-sand-500 uppercase tracking-wide">Questions if it goes quiet</p>
@@ -265,7 +272,7 @@ function UpcomingCard({ block, checkin, onConfirm, onUpdate, onResourceUpload, u
   )
 }
 
-// ─── Past session card ────────────────────────────────────────────────────────
+// ─── Past group session card ───────────────────────────────────────────────────
 function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
   const [linkMode,    setLinkMode]    = useState(false)
   const [linkInput,   setLinkInput]   = useState('')
@@ -307,7 +314,6 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
         {isComplete && <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">Complete ✓</span>}
       </div>
 
-      {/* Attended */}
       <button onClick={() => onUpdate(block, { attended: !attended })} className="flex items-center gap-2 w-full text-left">
         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${attended ? 'bg-blush-500 border-blush-500' : 'border-sand-300'}`}>
           {attended && <Check className="w-3 h-3 text-white"/>}
@@ -315,7 +321,6 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
         <span className={`text-sm font-medium ${attended ? 'text-sand-900' : 'text-sand-500'}`}>I attended this session</span>
       </button>
 
-      {/* Video */}
       <div className="space-y-2">
         <p className="text-xs font-semibold text-sand-500 uppercase tracking-wide">Session Recording</p>
         {videoUrl ? (
@@ -351,7 +356,6 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
         )}
       </div>
 
-      {/* Follow-ups */}
       <div>
         <p className="text-xs font-semibold text-sand-500 uppercase tracking-wide mb-1">Follow-ups</p>
         {followUps.length===0 && !addingFU && <p className="text-xs text-sand-400 italic">No follow-ups yet</p>}
@@ -379,16 +383,119 @@ function PastCard({ block, checkin, onUpdate, onVideoUpload, uploading }) {
   )
 }
 
+// ─── Log Clarity Call form ─────────────────────────────────────────────────────
+function LogClarityCallForm({ coachName, onSubmit, onCancel }) {
+  const today = toISO(new Date())
+  const [form, setForm] = useState({ date: today, memberName: '', time: '' })
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.memberName.trim()) return
+    setSaving(true)
+    await onSubmit({
+      coach_name: coachName,
+      session_date: form.date,
+      session_name: `[Bonus] Career Clarity Call — ${form.memberName.trim()}`,
+      week_start: getWeekMon(form.date),
+      day_key: getDayKey(form.date),
+      time: form.time.trim() || '',
+      attended: true,
+      loom_uploaded: false,
+      email_sent: false,
+    })
+    setSaving(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-violet-50 border border-violet-200 rounded-2xl p-4 space-y-3">
+      <p className="text-xs font-bold text-violet-700 uppercase tracking-widest">Log Clarity Call</p>
+      <div className="flex gap-3">
+        <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+          className="text-sm border border-sand-200 rounded-xl px-3 py-2 outline-none focus:border-violet-300 flex-1 bg-white"/>
+        <input value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
+          placeholder="Time (e.g. 2pm)"
+          className="text-sm border border-sand-200 rounded-xl px-3 py-2 outline-none focus:border-violet-300 w-32 bg-white"/>
+      </div>
+      <input value={form.memberName} onChange={e => setForm(f => ({ ...f, memberName: e.target.value }))}
+        placeholder="Member name…" autoFocus
+        className="w-full text-sm border border-sand-200 rounded-xl px-3 py-2 outline-none focus:border-violet-300 bg-white"/>
+      <div className="flex gap-2">
+        <button type="submit" disabled={!form.memberName.trim() || saving}
+          className="flex-1 py-2 bg-violet-500 text-white text-sm font-medium rounded-xl hover:bg-violet-600 disabled:opacity-50 transition-colors">
+          {saving ? 'Saving…' : 'Log call'}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-4 py-2 text-sand-400 hover:text-sand-600 text-sm rounded-xl border border-sand-200 hover:bg-white transition-colors">
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── Clarity Call card ─────────────────────────────────────────────────────────
+function ClarityCallCard({ checkin, onUpdate }) {
+  const loomDone  = checkin.loom_uploaded || false
+  const emailDone = checkin.email_sent    || false
+  const isComplete = loomDone && emailDone
+  const memberName = checkin.session_name.replace('[Bonus] Career Clarity Call — ', '').replace('[Bonus] Career Clarity Call for: ', '')
+
+  return (
+    <div className={`bg-white border rounded-2xl p-4 space-y-3 ${isComplete ? 'border-green-200' : 'border-violet-200'}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-bold text-sand-400 uppercase tracking-widest">
+            {friendlyDate(checkin.session_date)}{checkin.time ? ` · ${checkin.time}` : ''}
+          </p>
+          <h3 className="font-semibold text-sand-900 text-sm mt-0.5">[Bonus] Career Clarity Call</h3>
+          <p className="text-xs text-violet-600 font-medium mt-0.5">{memberName}</p>
+        </div>
+        {isComplete
+          ? <span className="shrink-0 text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">Complete ✓</span>
+          : <span className="shrink-0 text-[10px] font-bold text-violet-500 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5">Pending</span>
+        }
+      </div>
+
+      <div className="space-y-2 pt-1 border-t border-sand-100">
+        <button onClick={() => onUpdate(checkin, { loom_uploaded: !loomDone })}
+          className="flex items-center gap-2.5 w-full text-left group">
+          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${loomDone ? 'bg-violet-500 border-violet-500' : 'border-sand-300 group-hover:border-violet-300'}`}>
+            {loomDone && <Check className="w-3 h-3 text-white"/>}
+          </div>
+          <div className="flex items-center gap-2">
+            <Video className={`w-3.5 h-3.5 ${loomDone ? 'text-violet-500' : 'text-sand-400'}`}/>
+            <span className={`text-sm font-medium ${loomDone ? 'text-sand-900' : 'text-sand-500'}`}>Uploaded to Loom</span>
+          </div>
+        </button>
+
+        <button onClick={() => onUpdate(checkin, { email_sent: !emailDone })}
+          className="flex items-center gap-2.5 w-full text-left group">
+          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${emailDone ? 'bg-emerald-500 border-emerald-500' : 'border-sand-300 group-hover:border-emerald-300'}`}>
+            {emailDone && <Check className="w-3 h-3 text-white"/>}
+          </div>
+          <div className="flex items-center gap-2">
+            <Mail className={`w-3.5 h-3.5 ${emailDone ? 'text-emerald-500' : 'text-sand-400'}`}/>
+            <span className={`text-sm font-medium ${emailDone ? 'text-sand-900' : 'text-sand-500'}`}>Sent follow-up email</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function SessionsPage({ workspace = 'tanya' }) {
   const coachName = PERSON_LABEL[workspace] || workspace
   const todayDate = new Date(); todayDate.setHours(0,0,0,0)
 
-  const [blocks,    setBlocks]    = useState([])
-  const [checkins,  setCheckins]  = useState({})
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(null)
-  const [uploading, setUploading] = useState({})
+  const [blocks,          setBlocks]          = useState([])
+  const [checkins,        setCheckins]        = useState({})
+  const [clarityCheckins, setClarityCheckins] = useState([])
+  const [showLogForm,     setShowLogForm]     = useState(false)
+  const [loading,         setLoading]         = useState(true)
+  const [error,           setError]           = useState(null)
+  const [uploading,       setUploading]       = useState({})
   const [uploadingResource, setUploadingResource] = useState({})
 
   useEffect(() => {
@@ -398,8 +505,16 @@ export default function SessionsPage({ workspace = 'tanya' }) {
         const ceiling = addDays(todayDate, 14)
         setBlocks(rosterBlocks.filter(b => { const d = blockToDate(b); return d >= cutoff && d <= ceiling }))
         const map = {}
-        checkinList.forEach(c => { map[checkinKey(c.session_date, c.session_name)] = c })
+        const clarity = []
+        checkinList.forEach(c => {
+          if (c.session_name?.startsWith('[Bonus] Career Clarity Call')) {
+            clarity.push(c)
+          } else {
+            map[checkinKey(c.session_date, c.session_name)] = c
+          }
+        })
         setCheckins(map)
+        setClarityCheckins(clarity.sort((a, b) => b.session_date.localeCompare(a.session_date)))
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -460,6 +575,21 @@ export default function SessionsPage({ workspace = 'tanya' }) {
     finally { setUploadingResource(prev => ({ ...prev, [key]: false })) }
   }
 
+  async function handleLogClarity(data) {
+    try {
+      const saved = await upsertSessionCheckin(data)
+      setClarityCheckins(prev => [saved, ...prev])
+      setShowLogForm(false)
+    } catch(e) { setError(e.message) }
+  }
+
+  async function handleUpdateClarity(checkin, updates) {
+    try {
+      const saved = await upsertSessionCheckin({ ...checkin, ...updates })
+      setClarityCheckins(prev => prev.map(c => c.id === saved.id ? saved : c))
+    } catch(e) { setError(e.message) }
+  }
+
   const upcoming = blocks.filter(b => !isSessionPast(b)).sort((a,b) => blockToDate(a)-blockToDate(b))
   const past     = blocks.filter(b =>  isSessionPast(b)).sort((a,b) => blockToDate(b)-blockToDate(a))
 
@@ -478,7 +608,7 @@ export default function SessionsPage({ workspace = 'tanya' }) {
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
-      {/* Upcoming */}
+      {/* Upcoming group sessions */}
       <div className="space-y-4">
         <h2 className="text-xs font-bold text-sand-500 uppercase tracking-widest">Upcoming</h2>
         {upcoming.length === 0 ? (
@@ -497,7 +627,7 @@ export default function SessionsPage({ workspace = 'tanya' }) {
         )}
       </div>
 
-      {/* Recent sessions */}
+      {/* Recent group sessions */}
       {past.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-xs font-bold text-sand-500 uppercase tracking-widest">Recent Sessions</h2>
@@ -512,6 +642,50 @@ export default function SessionsPage({ workspace = 'tanya' }) {
           })}
         </div>
       )}
+
+      {/* Clarity Calls section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-bold text-sand-500 uppercase tracking-widest">Clarity Calls</h2>
+            {clarityCheckins.length > 0 && (
+              <span className="text-[10px] font-bold bg-violet-100 text-violet-600 rounded-full px-2 py-0.5">
+                {clarityCheckins.filter(c => !c.loom_uploaded || !c.email_sent).length} pending
+              </span>
+            )}
+          </div>
+          {!showLogForm && (
+            <button onClick={() => setShowLogForm(true)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 rounded-xl transition-colors">
+              <Plus className="w-3.5 h-3.5"/> Log a call
+            </button>
+          )}
+        </div>
+
+        {showLogForm && (
+          <LogClarityCallForm
+            coachName={coachName}
+            onSubmit={handleLogClarity}
+            onCancel={() => setShowLogForm(false)}
+          />
+        )}
+
+        {clarityCheckins.length === 0 && !showLogForm ? (
+          <div className="bg-white border border-sand-200 rounded-2xl px-4 py-8 text-center">
+            <PhoneCall className="w-6 h-6 text-sand-300 mx-auto mb-2"/>
+            <p className="text-sm text-sand-400">No clarity calls logged yet</p>
+            <button onClick={() => setShowLogForm(true)} className="text-violet-500 text-xs font-medium mt-1 hover:text-violet-700">
+              Log your first call →
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {clarityCheckins.map(c => (
+              <ClarityCallCard key={c.id} checkin={c} onUpdate={handleUpdateClarity}/>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

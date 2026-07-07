@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, AlertCircle, Check, Download, Printer, Send } from 'lucide-react'
-import { getTimelog, upsertTimelogRow, upsertTeamHourRow } from '../../lib/supabase'
+import { ChevronLeft, ChevronRight, AlertCircle, Check, Download, Printer, Send, CalendarCheck } from 'lucide-react'
+import { getTimelog, upsertTimelogRow, upsertTeamHourRow, getSessionCheckins } from '../../lib/supabase'
 
 const STD_HOURS = 7.6
 const STACEY_EMAIL = 'stacey@promotableyou.com.au'
@@ -366,12 +366,14 @@ function PaySummary({ fortnight, rows }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 const PERSON_LABEL = { shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em', william: 'William', tanya: 'Tanya', tanaz: 'Tanaz' }
 const COACH_LOG_URL = { tanya: '/log/tanya-log', tanaz: '/log/tanaz-log' }
+const COACH_WORKSPACES = ['tanya', 'tanaz']
 
 export default function TimesheetPage({ workspace = 'shaniah' }) {
   const [cycleStart, setCycleStart] = useState(getMostRecentFortnight)
-  const [rows, setRows]     = useState({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState(null)
+  const [rows, setRows]             = useState({})
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
+  const [sessionsByDate, setSessionsByDate] = useState({})
 
   const fortnight  = buildFortnight(cycleStart)
   const todayISO   = toISO(new Date())
@@ -385,6 +387,22 @@ export default function TimesheetPage({ workspace = 'shaniah' }) {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [workspace])
+
+  useEffect(() => {
+    if (!COACH_WORKSPACES.includes(workspace)) return
+    const coachName = PERSON_LABEL[workspace]
+    getSessionCheckins(coachName).then(checkins => {
+      const fortnightSet = new Set(fortnight.map(d => d.date))
+      const byDate = {}
+      checkins.forEach(c => {
+        if (c.attended && fortnightSet.has(c.session_date)) {
+          if (!byDate[c.session_date]) byDate[c.session_date] = []
+          byDate[c.session_date].push(c)
+        }
+      })
+      setSessionsByDate(byDate)
+    }).catch(() => {})
+  }, [workspace, cycleStart])
 
   function getRow(date) {
     return rows[date] || { date, type: 'Normal', clock_in: '', clock_out: '', notes: '' }
@@ -479,6 +497,48 @@ export default function TimesheetPage({ workspace = 'shaniah' }) {
           <AlertCircle className="w-4 h-4 shrink-0" />{error}
         </div>
       )}
+
+      {/* Session-based day suggestions (coaches only) */}
+      {COACH_WORKSPACES.includes(workspace) && Object.keys(sessionsByDate).length > 0 && (() => {
+        const unlogged = Object.entries(sessionsByDate).filter(([date]) => !isWorked(rows[date] || {}))
+        if (unlogged.length === 0) return null
+        return (
+          <div className="bg-violet-50 border border-violet-200 rounded-2xl overflow-hidden print:hidden">
+            <div className="px-5 py-3 bg-violet-100 border-b border-violet-200 flex items-center gap-2">
+              <CalendarCheck className="w-4 h-4 text-violet-600"/>
+              <p className="text-xs font-bold text-violet-700 uppercase tracking-widest flex-1">Sessions to log</p>
+              <button
+                onClick={() => unlogged.forEach(([date]) => handleChange(date, { clock_in: '09:00', clock_out: '17:00', type: 'Normal' }))}
+                className="text-xs font-bold text-violet-600 hover:text-violet-800 bg-white border border-violet-200 rounded-lg px-3 py-1 transition-colors"
+              >
+                Accept all
+              </button>
+            </div>
+            <div className="divide-y divide-violet-100">
+              {unlogged.map(([date, sessions]) => (
+                <div key={date} className="flex items-center gap-3 px-5 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-sand-900">
+                      {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </p>
+                    <p className="text-xs text-sand-400 truncate">
+                      {sessions.length} session{sessions.length > 1 ? 's' : ''} — {sessions.map(c =>
+                        c.session_name.replace('[Bonus] Career Clarity Call — ', '').replace('[Bonus] Career Clarity Call for: ', '')
+                      ).join(', ')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleChange(date, { clock_in: '09:00', clock_out: '17:00', type: 'Normal' })}
+                    className="shrink-0 text-xs font-bold px-3 py-1.5 bg-violet-500 text-white rounded-xl hover:bg-violet-600 transition-colors"
+                  >
+                    Accept
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Screen view */}
       <div className="print:hidden space-y-6">
