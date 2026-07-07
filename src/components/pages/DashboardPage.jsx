@@ -537,12 +537,12 @@ export default function DashboardPage({ workspace = 'shaniah' }) {
                 Full view <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
-            <div className="overflow-hidden" style={{ height: 260 }}>
+            <div className="overflow-hidden" style={{ height: 520 }}>
               <iframe
                 src={gcalAgenda(WORKSPACE_CONFIG[workspace]?.email || 'shaniah@promotableyou.com.au')}
                 style={{ border: 0, marginTop: -46, display: 'block' }}
                 width="100%"
-                height="320"
+                height="580"
                 frameBorder="0"
                 scrolling="no"
                 title="Upcoming Events"
