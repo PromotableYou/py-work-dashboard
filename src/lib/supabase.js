@@ -652,6 +652,14 @@ export async function uploadVideoToDrive(file, coachName, sessionDate, sessionNa
 }
 
 // ─── KEY PRIORITIES ───────────────────────────────────────────────────────────
+export async function getAllPriorityItems() {
+  const { data, error } = await supabase
+    .from('wd_priorities').select('*')
+    .neq('status', 'done')
+    .order('workspace').order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
 export async function getMyPriorities(workspace) {
   const { data, error } = await supabase
     .from('wd_priorities').select('*')
