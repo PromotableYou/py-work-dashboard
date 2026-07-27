@@ -7,6 +7,8 @@ import IdeasPage from './components/pages/IdeasPage'
 import BrainDumpPage from './components/pages/BrainDumpPage'
 import TimesheetPage from './components/pages/TimesheetPage'
 import NotesPage from './components/pages/NotesPage'
+import KeyPrioritiesPage from './components/pages/KeyPrioritiesPage'
+import MarketingCalendarPage from './components/pages/MarketingCalendarPage'
 import BossDashboardPage from './components/pages/boss/BossDashboardPage'
 import MeetingsPage from './components/pages/boss/MeetingsPage'
 import TeamHoursPage from './components/pages/boss/TeamHoursPage'
@@ -51,6 +53,8 @@ export default function App() {
                   <Route path="/notes" element={<NotesPage workspace="shaniah" />} />
                   <Route path="/roster" element={<RosterPage />} />
                   <Route path="/coaches-calendar" element={<CoachesCalendarPage />} />
+                  <Route path="/priorities" element={<KeyPrioritiesPage workspace="shaniah" />} />
+                  <Route path="/marketing" element={<MarketingCalendarPage />} />
                   {/* Stacey */}
                   <Route path="/stacey" element={<BossDashboardPage />} />
                   <Route path="/stacey/tasks" element={<TasksPage workspace="stacey" />} />
@@ -62,6 +66,8 @@ export default function App() {
                   <Route path="/stacey/coaches-calendar" element={<CoachesCalendarPage />} />
                   <Route path="/stacey/roster" element={<RosterPage readOnly />} />
                   <Route path="/stacey/team-hours" element={<TeamHoursPage />} />
+                  <Route path="/stacey/priorities" element={<KeyPrioritiesPage workspace="stacey" />} />
+                  <Route path="/stacey/marketing" element={<MarketingCalendarPage />} />
                   {/* Em */}
                   <Route path="/em" element={<DashboardPage workspace="em" />} />
                   <Route path="/em/tasks" element={<TasksPage workspace="em" />} />
@@ -72,6 +78,8 @@ export default function App() {
                   <Route path="/em/notes" element={<NotesPage workspace="em" />} />
                   <Route path="/em/ideas" element={<IdeasPage workspace="em" />} />
                   <Route path="/em/dump" element={<BrainDumpPage workspace="em" />} />
+                  <Route path="/em/priorities" element={<KeyPrioritiesPage workspace="em" />} />
+                  <Route path="/em/marketing" element={<MarketingCalendarPage />} />
                   {/* William */}
                   <Route path="/william" element={<DashboardPage workspace="william" />} />
                   <Route path="/william/tasks" element={<TasksPage workspace="william" />} />
@@ -82,6 +90,8 @@ export default function App() {
                   <Route path="/william/notes" element={<NotesPage workspace="william" />} />
                   <Route path="/william/ideas" element={<IdeasPage workspace="william" />} />
                   <Route path="/william/dump" element={<BrainDumpPage workspace="william" />} />
+                  <Route path="/william/priorities" element={<KeyPrioritiesPage workspace="william" />} />
+                  <Route path="/william/marketing" element={<MarketingCalendarPage />} />
                   {/* Tanya */}
                   <Route path="/tanya" element={<DashboardPage workspace="tanya" />} />
                   <Route path="/tanya/tasks" element={<TasksPage workspace="tanya" />} />
@@ -92,6 +102,7 @@ export default function App() {
                   <Route path="/tanya/ideas" element={<IdeasPage workspace="tanya" />} />
                   <Route path="/tanya/dump" element={<BrainDumpPage workspace="tanya" />} />
                   <Route path="/tanya/timesheet" element={<SimpleCoachLogPage coachSlug="tanya-log" />} />
+                  <Route path="/tanya/priorities" element={<KeyPrioritiesPage workspace="tanya" />} />
                   {/* Tanaz */}
                   <Route path="/tanaz" element={<DashboardPage workspace="tanaz" />} />
                   <Route path="/tanaz/tasks" element={<TasksPage workspace="tanaz" />} />
@@ -102,6 +113,7 @@ export default function App() {
                   <Route path="/tanaz/ideas" element={<IdeasPage workspace="tanaz" />} />
                   <Route path="/tanaz/dump" element={<BrainDumpPage workspace="tanaz" />} />
                   <Route path="/tanaz/timesheet" element={<SimpleCoachLogPage coachSlug="tanaz-log" />} />
+                  <Route path="/tanaz/priorities" element={<KeyPrioritiesPage workspace="tanaz" />} />
                 </Routes>
               </div>
             </main>

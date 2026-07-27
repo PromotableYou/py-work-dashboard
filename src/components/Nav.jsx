@@ -1,6 +1,6 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList, ChevronDown, Video } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList, ChevronDown, Video, Target, Megaphone } from 'lucide-react'
 import { getUnapprovedCoachLogsCount, getUnreviewedVideos } from '../lib/supabase'
 
 const WORKSPACES = [
@@ -17,6 +17,8 @@ const WORKSPACES = [
       { to: '/ideas',            icon: Lightbulb,       label: 'Ideas'       },
       { to: '/dump',             icon: Brain,           label: 'Brain Dump'  },
       { to: '/timesheet',        icon: Clock,           label: 'Timesheet'   },
+      { to: '/priorities',       icon: Target,          label: 'Priorities'  },
+      { to: '/marketing',        icon: Megaphone,       label: 'Mktg Cal'    },
     ],
   },
   {
@@ -32,6 +34,8 @@ const WORKSPACES = [
       { to: '/stacey/ideas',            icon: Lightbulb,       label: 'Ideas'       },
       { to: '/stacey/dump',             icon: Brain,           label: 'Brain Dump'  },
       { to: '/stacey/team-hours',       icon: Users,           label: 'Team Hours', badge: true },
+      { to: '/stacey/priorities',       icon: Target,          label: 'Priorities'  },
+      { to: '/stacey/marketing',        icon: Megaphone,       label: 'Mktg Cal'    },
     ],
   },
   {
@@ -45,6 +49,8 @@ const WORKSPACES = [
       { to: '/em/notes',           icon: StickyNote,      label: 'Notes'       },
       { to: '/em/ideas',           icon: Lightbulb,       label: 'Ideas'       },
       { to: '/em/dump',            icon: Brain,           label: 'Brain Dump'  },
+      { to: '/em/priorities',      icon: Target,          label: 'Priorities'  },
+      { to: '/em/marketing',       icon: Megaphone,       label: 'Mktg Cal'    },
     ],
   },
   {
@@ -58,6 +64,8 @@ const WORKSPACES = [
       { to: '/william/notes',           icon: StickyNote,      label: 'Notes'       },
       { to: '/william/ideas',           icon: Lightbulb,       label: 'Ideas'       },
       { to: '/william/dump',            icon: Brain,           label: 'Brain Dump'  },
+      { to: '/william/priorities',      icon: Target,          label: 'Priorities'  },
+      { to: '/william/marketing',       icon: Megaphone,       label: 'Mktg Cal'    },
     ],
   },
   {
@@ -70,6 +78,7 @@ const WORKSPACES = [
       { to: '/tanya/ideas',     icon: Lightbulb,       label: 'Ideas'       },
       { to: '/tanya/dump',      icon: Brain,           label: 'Brain Dump'  },
       { to: '/tanya/timesheet', icon: Clock,           label: 'Timesheet'   },
+      { to: '/tanya/priorities',icon: Target,          label: 'Priorities'  },
     ],
   },
   {
@@ -82,6 +91,7 @@ const WORKSPACES = [
       { to: '/tanaz/ideas',     icon: Lightbulb,       label: 'Ideas'       },
       { to: '/tanaz/dump',      icon: Brain,           label: 'Brain Dump'  },
       { to: '/tanaz/timesheet', icon: Clock,           label: 'Timesheet'   },
+      { to: '/tanaz/priorities',icon: Target,          label: 'Priorities'  },
     ],
   },
 ]

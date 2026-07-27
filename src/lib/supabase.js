@@ -650,3 +650,66 @@ export async function uploadVideoToDrive(file, coachName, sessionDate, sessionNa
 
   return `https://drive.google.com/file/d/${fileId}/view`
 }
+
+// ─── KEY PRIORITIES ───────────────────────────────────────────────────────────
+export async function getMyPriorities(workspace) {
+  const { data, error } = await supabase
+    .from('wd_priorities').select('*')
+    .eq('workspace', workspace).neq('status', 'done')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+export async function getAllActivePriorities() {
+  const { data, error } = await supabase
+    .from('wd_priorities').select('*')
+    .eq('status', 'active')
+    .order('workspace').order('slot', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+export async function getAllPendingPriorities() {
+  const { data, error } = await supabase
+    .from('wd_priorities').select('*')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+export async function addPriorityItem(item) {
+  const { data, error } = await supabase
+    .from('wd_priorities').insert([item]).select().single()
+  if (error) throw error
+  return data
+}
+export async function updatePriorityItem(id, updates) {
+  const { error } = await supabase.from('wd_priorities').update(updates).eq('id', id)
+  if (error) throw error
+}
+export async function deletePriorityItem(id) {
+  const { error } = await supabase.from('wd_priorities').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ─── MARKETING CALENDAR ───────────────────────────────────────────────────────
+export async function getMarketingEvents() {
+  const { data, error } = await supabase
+    .from('wd_marketing_calendar').select('*')
+    .order('date', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+export async function addMarketingEvent(event) {
+  const { data, error } = await supabase
+    .from('wd_marketing_calendar').insert([event]).select().single()
+  if (error) throw error
+  return data
+}
+export async function updateMarketingEvent(id, updates) {
+  const { error } = await supabase.from('wd_marketing_calendar').update(updates).eq('id', id)
+  if (error) throw error
+}
+export async function deleteMarketingEvent(id) {
+  const { error } = await supabase.from('wd_marketing_calendar').delete().eq('id', id)
+  if (error) throw error
+}
