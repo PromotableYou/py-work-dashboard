@@ -61,17 +61,6 @@ const WORKSPACES = [
     ],
   },
   {
-    slug: 'tanya', label: 'Tanya', home: '/tanya',
-    links: [
-      { to: '/tanya',           icon: LayoutDashboard, label: 'Dashboard',   end: true },
-      { to: '/tanya/tasks',     icon: CheckSquare,     label: 'Tasks'       },
-      { to: '/tanya/sessions',  icon: Video,           label: 'Sessions'    },
-      { to: '/tanya/notes',     icon: StickyNote,      label: 'Notes'       },
-      { to: '/tanya/timesheet', icon: Clock,           label: 'Timesheet'   },
-      { to: '/tanya/priorities',icon: Target,          label: 'Priorities'  },
-    ],
-  },
-  {
     slug: 'tanaz', label: 'Tanaz', home: '/tanaz',
     links: [
       { to: '/tanaz',           icon: LayoutDashboard, label: 'Dashboard',   end: true },

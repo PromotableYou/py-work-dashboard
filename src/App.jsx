@@ -97,17 +97,6 @@ export default function App() {
                   <Route path="/william/priorities" element={<KeyPrioritiesPage workspace="william" />} />
                   <Route path="/william/marketing" element={<MarketingCalendarPage />} />
                   <Route path="/william/sales" element={<SalesPage workspace="william" />} />
-                  {/* Tanya */}
-                  <Route path="/tanya" element={<DashboardPage workspace="tanya" />} />
-                  <Route path="/tanya/tasks" element={<TasksPage workspace="tanya" />} />
-                  <Route path="/tanya/calendar" element={<CalendarPage calendarEmail="tanya@promotableyou.com.au" />} />
-                  <Route path="/tanya/sessions" element={<SessionsPage workspace="tanya" />} />
-                  <Route path="/tanya/roster" element={<RosterPage readOnly />} />
-                  <Route path="/tanya/notes" element={<NotesPage workspace="tanya" />} />
-                  <Route path="/tanya/ideas" element={<IdeasPage workspace="tanya" />} />
-                  <Route path="/tanya/dump" element={<BrainDumpPage workspace="tanya" />} />
-                  <Route path="/tanya/timesheet" element={<SimpleCoachLogPage coachSlug="tanya-log" />} />
-                  <Route path="/tanya/priorities" element={<KeyPrioritiesPage workspace="tanya" />} />
                   {/* Tanaz */}
                   <Route path="/tanaz" element={<DashboardPage workspace="tanaz" />} />
                   <Route path="/tanaz/tasks" element={<TasksPage workspace="tanaz" />} />

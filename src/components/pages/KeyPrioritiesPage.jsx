@@ -5,8 +5,8 @@ import {
   addPriorityItem, updatePriorityItem, deletePriorityItem,
 } from '../../lib/supabase'
 
-const WORKSPACES = ['shaniah', 'stacey', 'em', 'william', 'tanya', 'tanaz']
-const WS_NAMES   = { shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em', william: 'William', tanya: 'Tanya', tanaz: 'Tanaz' }
+const WORKSPACES = ['shaniah', 'stacey', 'em', 'william', 'tanaz']
+const WS_NAMES   = { shaniah: 'Shaniah', stacey: 'Stacey', em: 'Em', william: 'William', tanaz: 'Tanaz' }
 const BOSS       = ['shaniah', 'stacey']
 
 const SLOT_STYLE = {
@@ -260,18 +260,17 @@ export default function KeyPrioritiesPage({ workspace = 'shaniah' }) {
     return allItems.filter(i => i.workspace === ws && i.status === 'backlog')
   }
 
-  // Add task to any workspace; assigned_by = current workspace
+  // Add task to any workspace
   async function handleAddTask(fields) {
     const targetWs = fields.workspace || workspace
     try {
       const saved = await addPriorityItem({
-        workspace:   targetWs,
-        assigned_by: workspace,
-        status:      'backlog',
-        title:       fields.title,
-        notes:       fields.notes,
-        priority:    fields.priority,
-        due_date:    fields.due_date,
+        workspace: targetWs,
+        status:    'backlog',
+        title:     fields.title,
+        notes:     fields.notes,
+        priority:  fields.priority,
+        due_date:  fields.due_date,
       })
       setAllItems(p => [...p, saved])
       setShowAdd(false)
@@ -467,8 +466,7 @@ export default function KeyPrioritiesPage({ workspace = 'shaniah' }) {
             <h2 className="text-sm font-bold text-sand-700 mb-3">Team Task Lists</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {WORKSPACES.map(w => {
-                const tasks     = backlogFor(w)
-                const isAddOpen = showAddFor === w
+                const tasks = backlogFor(w)
                 return (
                   <div key={w} className="bg-white border border-sand-200 rounded-2xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-sand-100">
@@ -483,27 +481,14 @@ export default function KeyPrioritiesPage({ workspace = 'shaniah' }) {
                         )}
                       </div>
                       <button
-                        onClick={() => setShowAddFor(isAddOpen ? null : w)}
+                        onClick={() => setShowAddFor(w)}
                         className="flex items-center gap-1 text-xs font-semibold text-blush-600 hover:text-blush-700 bg-blush-50 border border-blush-200 hover:bg-blush-100 px-2.5 py-1 rounded-lg transition-colors"
                       >
                         <Plus className="w-3 h-3"/>Add
                       </button>
                     </div>
-
-                    {isAddOpen && (
-                      <div className="p-3">
-                        <TaskForm
-                          currentWorkspace={workspace}
-                          allowPick={false}
-                          onSave={fields => handleAddTask({ ...fields, workspace: w })}
-                          onClose={() => setShowAddFor(null)}
-                          title={`Add to ${WS_NAMES[w]}'s list`}
-                        />
-                      </div>
-                    )}
-
                     <div className="divide-y divide-sand-50">
-                      {tasks.length === 0 && !isAddOpen ? (
+                      {tasks.length === 0 ? (
                         <p className="text-xs text-sand-300 text-center py-5 italic">No tasks yet</p>
                       ) : (
                         tasks.map(item => (
@@ -517,43 +502,29 @@ export default function KeyPrioritiesPage({ workspace = 'shaniah' }) {
                         ))
                       )}
                     </div>
-
-                    {/* Boss slot-assignment for other people's lists */}
-                    {isBoss && w !== workspace && tasks.length > 0 && (
-                      <div className="px-3 pb-3 pt-1">
-                        <p className="text-[10px] text-sand-400 italic">Hover a task and use slot buttons on their My Tasks page</p>
-                      </div>
-                    )}
                   </div>
                 )
               })}
             </div>
           </div>
 
-          {/* Assign to any workspace (quick add with picker) */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-sand-700">Assign a task to someone</h2>
-              {!showAdd && (
-                <button onClick={() => setShowAdd(true)}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-blush-600 hover:text-blush-700 bg-blush-50 border border-blush-200 px-3 py-1.5 rounded-lg transition-colors">
-                  <Plus className="w-3.5 h-3.5"/> New task
-                </button>
-              )}
+          {/* Modal overlay for adding a task to a specific person */}
+          {showAddFor && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
+              onClick={() => setShowAddFor(null)}
+            >
+              <div className="w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <TaskForm
+                  currentWorkspace={workspace}
+                  onSave={fields => handleAddTask({ ...fields, workspace: showAddFor })}
+                  onClose={() => setShowAddFor(null)}
+                  title={`Add to ${WS_NAMES[showAddFor]}'s list`}
+                />
+              </div>
             </div>
-            {showAdd && (
-              <TaskForm
-                currentWorkspace={workspace}
-                allowPick={true}
-                onSave={handleAddTask}
-                onClose={() => setShowAdd(false)}
-                title="Add task for team member"
-              />
-            )}
-            {!showAdd && (
-              <p className="text-xs text-sand-400">Use the <span className="font-semibold">+ Add</span> button on each person's list, or click "New task" to pick a person from a dropdown.</p>
-            )}
-          </div>
+          )}
+
         </div>
       )}
 
