@@ -1,6 +1,6 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList, ChevronDown, Video, Target, Megaphone } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList, ChevronDown, Video, Target, Megaphone, DollarSign } from 'lucide-react'
 import { getUnapprovedCoachLogsCount, getUnreviewedVideos } from '../lib/supabase'
 
 const WORKSPACES = [
@@ -19,6 +19,7 @@ const WORKSPACES = [
       { to: '/timesheet',        icon: Clock,           label: 'Timesheet'   },
       { to: '/priorities',       icon: Target,          label: 'Priorities'  },
       { to: '/marketing',        icon: Megaphone,       label: 'Mktg Cal'    },
+      { to: '/sales',            icon: DollarSign,      label: 'Sales'       },
     ],
   },
   {
@@ -36,6 +37,7 @@ const WORKSPACES = [
       { to: '/stacey/team-hours',       icon: Users,           label: 'Team Hours', badge: true },
       { to: '/stacey/priorities',       icon: Target,          label: 'Priorities'  },
       { to: '/stacey/marketing',        icon: Megaphone,       label: 'Mktg Cal'    },
+      { to: '/stacey/sales',            icon: DollarSign,      label: 'Sales'       },
     ],
   },
   {
@@ -51,6 +53,7 @@ const WORKSPACES = [
       { to: '/em/dump',            icon: Brain,           label: 'Brain Dump'  },
       { to: '/em/priorities',      icon: Target,          label: 'Priorities'  },
       { to: '/em/marketing',       icon: Megaphone,       label: 'Mktg Cal'    },
+      { to: '/em/sales',           icon: DollarSign,      label: 'Sales'       },
     ],
   },
   {
@@ -66,6 +69,7 @@ const WORKSPACES = [
       { to: '/william/dump',            icon: Brain,           label: 'Brain Dump'  },
       { to: '/william/priorities',      icon: Target,          label: 'Priorities'  },
       { to: '/william/marketing',       icon: Megaphone,       label: 'Mktg Cal'    },
+      { to: '/william/sales',           icon: DollarSign,      label: 'Sales'       },
     ],
   },
   {

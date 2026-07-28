@@ -9,6 +9,7 @@ import TimesheetPage from './components/pages/TimesheetPage'
 import NotesPage from './components/pages/NotesPage'
 import KeyPrioritiesPage from './components/pages/KeyPrioritiesPage'
 import MarketingCalendarPage from './components/pages/MarketingCalendarPage'
+import SalesPage from './components/pages/SalesPage'
 import BossDashboardPage from './components/pages/boss/BossDashboardPage'
 import MeetingsPage from './components/pages/boss/MeetingsPage'
 import TeamHoursPage from './components/pages/boss/TeamHoursPage'
@@ -55,6 +56,7 @@ export default function App() {
                   <Route path="/coaches-calendar" element={<CoachesCalendarPage />} />
                   <Route path="/priorities" element={<KeyPrioritiesPage workspace="shaniah" />} />
                   <Route path="/marketing" element={<MarketingCalendarPage />} />
+                  <Route path="/sales" element={<SalesPage workspace="shaniah" />} />
                   {/* Stacey */}
                   <Route path="/stacey" element={<BossDashboardPage />} />
                   <Route path="/stacey/tasks" element={<TasksPage workspace="stacey" />} />
@@ -68,6 +70,7 @@ export default function App() {
                   <Route path="/stacey/team-hours" element={<TeamHoursPage />} />
                   <Route path="/stacey/priorities" element={<KeyPrioritiesPage workspace="stacey" />} />
                   <Route path="/stacey/marketing" element={<MarketingCalendarPage />} />
+                  <Route path="/stacey/sales" element={<SalesPage workspace="stacey" />} />
                   {/* Em */}
                   <Route path="/em" element={<DashboardPage workspace="em" />} />
                   <Route path="/em/tasks" element={<TasksPage workspace="em" />} />
@@ -80,6 +83,7 @@ export default function App() {
                   <Route path="/em/dump" element={<BrainDumpPage workspace="em" />} />
                   <Route path="/em/priorities" element={<KeyPrioritiesPage workspace="em" />} />
                   <Route path="/em/marketing" element={<MarketingCalendarPage />} />
+                  <Route path="/em/sales" element={<SalesPage workspace="em" />} />
                   {/* William */}
                   <Route path="/william" element={<DashboardPage workspace="william" />} />
                   <Route path="/william/tasks" element={<TasksPage workspace="william" />} />
@@ -92,6 +96,7 @@ export default function App() {
                   <Route path="/william/dump" element={<BrainDumpPage workspace="william" />} />
                   <Route path="/william/priorities" element={<KeyPrioritiesPage workspace="william" />} />
                   <Route path="/william/marketing" element={<MarketingCalendarPage />} />
+                  <Route path="/william/sales" element={<SalesPage workspace="william" />} />
                   {/* Tanya */}
                   <Route path="/tanya" element={<DashboardPage workspace="tanya" />} />
                   <Route path="/tanya/tasks" element={<TasksPage workspace="tanya" />} />

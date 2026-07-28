@@ -721,3 +721,27 @@ export async function deleteMarketingEvent(id) {
   const { error } = await supabase.from('wd_marketing_calendar').delete().eq('id', id)
   if (error) throw error
 }
+
+// ─── SALES / COMMISSION ───────────────────────────────────────────────────────
+export async function getMySales(workspace) {
+  const { data, error } = await supabase
+    .from('wd_sales').select('*')
+    .eq('workspace', workspace)
+    .order('date', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+export async function addSale(sale) {
+  const { data, error } = await supabase
+    .from('wd_sales').insert([sale]).select().single()
+  if (error) throw error
+  return data
+}
+export async function updateSale(id, updates) {
+  const { error } = await supabase.from('wd_sales').update(updates).eq('id', id)
+  if (error) throw error
+}
+export async function deleteSale(id) {
+  const { error } = await supabase.from('wd_sales').delete().eq('id', id)
+  if (error) throw error
+}
