@@ -1,6 +1,6 @@
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
-import { LayoutDashboard, CheckSquare, Calendar, Lightbulb, Brain, Clock, Users, CalendarDays, CalendarRange, StickyNote, ClipboardList, ChevronDown, Video, Target, Megaphone, DollarSign } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, Clock, Users, CalendarRange, StickyNote, ClipboardList, ChevronDown, Video, Target, Megaphone, DollarSign } from 'lucide-react'
 import { getUnapprovedCoachLogsCount, getUnreviewedVideos } from '../lib/supabase'
 
 const WORKSPACES = [
@@ -10,12 +10,9 @@ const WORKSPACES = [
       { to: '/',                 icon: LayoutDashboard, label: 'Dashboard',   end: true, videoBadge: true },
       { to: '/tasks',            icon: CheckSquare,     label: 'Tasks'       },
       { to: '/calendar',         icon: Calendar,        label: 'Calendar'    },
-      { to: '/meetings',         icon: CalendarDays,    label: 'Meetings'    },
       { to: '/coaches-calendar', icon: CalendarRange,   label: 'Coaches Cal' },
       { to: '/roster',           icon: ClipboardList,   label: 'Roster'      },
       { to: '/notes',            icon: StickyNote,      label: 'Notes'       },
-      { to: '/ideas',            icon: Lightbulb,       label: 'Ideas'       },
-      { to: '/dump',             icon: Brain,           label: 'Brain Dump'  },
       { to: '/timesheet',        icon: Clock,           label: 'Timesheet'   },
       { to: '/priorities',       icon: Target,          label: 'Priorities'  },
       { to: '/marketing',        icon: Megaphone,       label: 'Mktg Cal'    },
@@ -28,12 +25,9 @@ const WORKSPACES = [
       { to: '/stacey',                  icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/stacey/tasks',            icon: CheckSquare,     label: 'Tasks'       },
       { to: '/stacey/calendar',         icon: Calendar,        label: 'Calendar'    },
-      { to: '/stacey/meetings',         icon: CalendarDays,    label: 'Meetings'    },
       { to: '/stacey/coaches-calendar', icon: CalendarRange,   label: 'Coaches Cal' },
       { to: '/stacey/roster',           icon: ClipboardList,   label: 'Roster'      },
       { to: '/stacey/notes',            icon: StickyNote,      label: 'Notes'       },
-      { to: '/stacey/ideas',            icon: Lightbulb,       label: 'Ideas'       },
-      { to: '/stacey/dump',             icon: Brain,           label: 'Brain Dump'  },
       { to: '/stacey/team-hours',       icon: Users,           label: 'Team Hours', badge: true },
       { to: '/stacey/priorities',       icon: Target,          label: 'Priorities'  },
       { to: '/stacey/marketing',        icon: Megaphone,       label: 'Mktg Cal'    },
@@ -45,12 +39,9 @@ const WORKSPACES = [
     links: [
       { to: '/em',                 icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/em/tasks',           icon: CheckSquare,     label: 'Tasks'       },
-      { to: '/em/meetings',        icon: CalendarDays,    label: 'Meetings'    },
       { to: '/em/coaches-calendar',icon: CalendarRange,   label: 'Coaches Cal' },
       { to: '/em/roster',          icon: ClipboardList,   label: 'Roster'      },
       { to: '/em/notes',           icon: StickyNote,      label: 'Notes'       },
-      { to: '/em/ideas',           icon: Lightbulb,       label: 'Ideas'       },
-      { to: '/em/dump',            icon: Brain,           label: 'Brain Dump'  },
       { to: '/em/priorities',      icon: Target,          label: 'Priorities'  },
       { to: '/em/marketing',       icon: Megaphone,       label: 'Mktg Cal'    },
       { to: '/em/sales',           icon: DollarSign,      label: 'Sales'       },
@@ -61,12 +52,9 @@ const WORKSPACES = [
     links: [
       { to: '/william',                 icon: LayoutDashboard, label: 'Dashboard',   end: true },
       { to: '/william/tasks',           icon: CheckSquare,     label: 'Tasks'       },
-      { to: '/william/meetings',        icon: CalendarDays,    label: 'Meetings'    },
       { to: '/william/coaches-calendar',icon: CalendarRange,   label: 'Coaches Cal' },
       { to: '/william/roster',          icon: ClipboardList,   label: 'Roster'      },
       { to: '/william/notes',           icon: StickyNote,      label: 'Notes'       },
-      { to: '/william/ideas',           icon: Lightbulb,       label: 'Ideas'       },
-      { to: '/william/dump',            icon: Brain,           label: 'Brain Dump'  },
       { to: '/william/priorities',      icon: Target,          label: 'Priorities'  },
       { to: '/william/marketing',       icon: Megaphone,       label: 'Mktg Cal'    },
       { to: '/william/sales',           icon: DollarSign,      label: 'Sales'       },
@@ -79,8 +67,6 @@ const WORKSPACES = [
       { to: '/tanya/tasks',     icon: CheckSquare,     label: 'Tasks'       },
       { to: '/tanya/sessions',  icon: Video,           label: 'Sessions'    },
       { to: '/tanya/notes',     icon: StickyNote,      label: 'Notes'       },
-      { to: '/tanya/ideas',     icon: Lightbulb,       label: 'Ideas'       },
-      { to: '/tanya/dump',      icon: Brain,           label: 'Brain Dump'  },
       { to: '/tanya/timesheet', icon: Clock,           label: 'Timesheet'   },
       { to: '/tanya/priorities',icon: Target,          label: 'Priorities'  },
     ],
@@ -92,8 +78,6 @@ const WORKSPACES = [
       { to: '/tanaz/tasks',     icon: CheckSquare,     label: 'Tasks'       },
       { to: '/tanaz/sessions',  icon: Video,           label: 'Sessions'    },
       { to: '/tanaz/notes',     icon: StickyNote,      label: 'Notes'       },
-      { to: '/tanaz/ideas',     icon: Lightbulb,       label: 'Ideas'       },
-      { to: '/tanaz/dump',      icon: Brain,           label: 'Brain Dump'  },
       { to: '/tanaz/timesheet', icon: Clock,           label: 'Timesheet'   },
       { to: '/tanaz/priorities',icon: Target,          label: 'Priorities'  },
     ],
